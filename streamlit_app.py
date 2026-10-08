@@ -238,11 +238,11 @@ with col_visual:
 
     if display_mode == "3D Hull View":
         st.markdown("---")
-        st.markdown("### 3D Realistic B737-800 Hull & Compartments")
+        st.markdown("### 3D Aircraft Hull & Internal Compartments")
         
-        # Detailed Fuselage Profile
+        # Build 3D Fuselage Shell (With Nose and Tail Taper)
         u = np.linspace(0, 2 * np.pi, 24)
-        y_fuselage = np.linspace(0, 39.5, 40)
+        y_fuselage = np.linspace(0, 39.5, 35)
         u_grid, y_grid = np.meshgrid(u, y_fuselage)
         
         r_profile = np.piecewise(y_fuselage, 
@@ -260,63 +260,43 @@ with col_visual:
         
         fig_3d = go.Figure()
         
-        # 1. Translucent Realistic Fuselage Body
+        # 1. Translucent Fuselage Body
         fig_3d.add_trace(go.Surface(
             x=x_hull, y=y_grid, z=z_hull,
-            opacity=0.18,
-            colorscale=[[0, "#e0f7fa"], [1, "#0288d1"]],
+            opacity=0.15,
+            colorscale=[[0, "#29b6f6"], [1, "#0288d1"]],
             showscale=False,
-            name="Fuselage Shell"
+            name="Outer Hull"
         ))
         
-        # 2. Main Wings with Swept Geometry & Dihedral
-        fig_3d.add_trace(go.Mesh3d(
-            x=[0, -17.2, -17.2, -1.8, 1.8, 17.2, 17.2, 0],
-            y=[15.0, 21.0, 23.2, 19.8, 19.8, 23.2, 21.0, 15.0],
-            z=[-0.3, 0.8, 0.8, -0.2, -0.2, 0.8, 0.8, -0.3],
-            color="#0288d1",
-            opacity=0.45,
-            name="Swept Wings"
-        ))
-        
-        # 3. Winglets (B737-800 Blended Winglets)
+        # 2. Main Wings with Winglets Upward
         fig_3d.add_trace(go.Scatter3d(
-            x=[-17.2, -17.2, 17.2, 17.2],
-            y=[21.0, 23.2, 21.0, 23.2],
-            z=[0.8, 2.8, 0.8, 2.8],
+            x=[0, -16.0, -16.0, -16.0, 0, 16.0, 16.0, 16.0, 0],
+            y=[15.0, 21.0, 22.5, 22.5, 19.5, 22.5, 22.5, 21.0, 15.0],
+            z=[-0.2, 0.5, 0.5, 2.2, -0.2, 2.2, 0.5, 0.5, -0.2],
             mode="lines",
-            line=dict(color="#00e676", width=4),
-            name="Winglets"
+            line=dict(color="#4fc3f7", width=5),
+            name="Wings & Winglets"
         ))
 
-        # 4. CFM56 Engines (Pods under wings)
-        fig_3d.add_trace(go.Mesh3d(
-            x=[-4.8, -4.8, -4.0, -4.0, 4.0, 4.0, 4.8, 4.8],
-            y=[16.5, 19.5, 19.5, 16.5, 16.5, 19.5, 19.5, 16.5],
-            z=[-1.2, -1.2, -1.2, -1.2, -1.2, -1.2, -1.2, -1.2],
-            color="#eceff1",
-            opacity=0.85,
-            name="CFM56 Engines"
-        ))
-
-        # 5. Tail Fin (Vertical Stabilizer)
-        fig_3d.add_trace(go.Mesh3d(
+        # 3. Vertical Tail Fin
+        fig_3d.add_trace(go.Scatter3d(
             x=[0, 0, 0, 0],
-            y=[31.0, 37.5, 39.0, 35.5],
-            z=[1.8, 6.2, 6.2, 1.8],
-            color="#0288d1",
-            opacity=0.6,
-            name="Vertical Fin"
+            y=[32.0, 37.0, 38.5, 35.0],
+            z=[1.8, 5.5, 5.5, 1.8],
+            mode="lines",
+            line=dict(color="#0288d1", width=5),
+            name="Tail Fin"
         ))
         
-        # --- Internal Safety Status Colors ---
+        # Internal Status Colors
         fuel_color = "#00e676" if (to_fuel <= 20800 and is_tow_safe) else "#ff1744"
         h1_color = "#00e676" if c1 <= LIMITS["HOLD1_MAX"] else "#ff1744"
         h2_color = "#00e676" if c2 <= LIMITS["HOLD2_MAX"] else "#ff1744"
         h3_color = "#00e676" if c3 <= LIMITS["HOLD3_MAX"] else "#ff1744"
         h4_color = "#00e676" if c4 <= LIMITS["HOLD4_MAX"] else "#ff1744"
 
-        # Fuel Tank Mesh
+        # Fuel Tanks
         fig_3d.add_trace(go.Mesh3d(
             x=[0, -14.0, -14.0, 0, 14.0, 14.0],
             y=[16.0, 19.5, 21.0, 19.5, 21.0, 19.5],
@@ -326,33 +306,33 @@ with col_visual:
             name=f"Fuel Tank ({to_fuel:,} kg)"
         ))
         
-        # Internal Holds
+        # Cargo Holds
         fig_3d.add_trace(go.Mesh3d(
             x=[-1, -1, 1, 1, -1, -1, 1, 1],
             y=[7.5, 10.0, 10.0, 7.5, 7.5, 10.0, 10.0, 7.5],
             z=[-1.4, -1.4, -1.4, -1.4, -0.4, -0.4, -0.4, -0.4],
-            color=h1_color, opacity=0.7, name=f"Hold 1: {c1}kg"
+            color=h1_color, opacity=0.75, name=f"Hold 1: {c1}kg"
         ))
         fig_3d.add_trace(go.Mesh3d(
             x=[-1, -1, 1, 1, -1, -1, 1, 1],
             y=[10.2, 12.8, 12.8, 10.2, 10.2, 12.8, 12.8, 10.2],
             z=[-1.4, -1.4, -1.4, -1.4, -0.4, -0.4, -0.4, -0.4],
-            color=h2_color, opacity=0.7, name=f"Hold 2: {c2}kg"
+            color=h2_color, opacity=0.75, name=f"Hold 2: {c2}kg"
         ))
         fig_3d.add_trace(go.Mesh3d(
             x=[-1, -1, 1, 1, -1, -1, 1, 1],
             y=[18.5, 21.8, 21.8, 18.5, 18.5, 21.8, 21.8, 18.5],
             z=[-1.4, -1.4, -1.4, -1.4, -0.4, -0.4, -0.4, -0.4],
-            color=h3_color, opacity=0.7, name=f"Hold 3: {c3}kg"
+            color=h3_color, opacity=0.75, name=f"Hold 3: {c3}kg"
         ))
         fig_3d.add_trace(go.Mesh3d(
             x=[-1, -1, 1, 1, -1, -1, 1, 1],
             y=[22.0, 24.5, 24.5, 22.0, 22.0, 24.5, 24.5, 22.0],
             z=[-1.4, -1.4, -1.4, -1.4, -0.4, -0.4, -0.4, -0.4],
-            color=h4_color, opacity=0.7, name=f"Hold 4: {c4}kg"
+            color=h4_color, opacity=0.75, name=f"Hold 4: {c4}kg"
         ))
 
-        # Actual Flight CG Diamond
+        # Actual Flight CG Point
         cg_color = "#00e676" if is_mac_safe else "#ff1744"
         fig_3d.add_trace(go.Scatter3d(
             x=[0.0],
@@ -376,12 +356,12 @@ with col_visual:
             ),
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
-            height=390,
+            height=380,
             margin=dict(l=0, r=0, t=10, b=0),
             showlegend=False
         )
 
-        st.plotly_chart(fig_3d, use_container_width=True, key="b737_3d_realistic_v3")
+        st.plotly_chart(fig_3d, use_container_width=True, key="b737_3d_clean_hull")
 
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("### Cabin Seating Visualizer:")
