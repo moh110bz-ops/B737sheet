@@ -366,14 +366,24 @@ elif st.session_state.current_page == "WNB_Engine":
             pax_c = st.number_input("Zone C Pax:", min_value=0, max_value=cap_c, value=default_c, step=1)
 
         st.markdown("---")
-        st.write("**Cargo Holds Loading (kg) - Fully Editable:**")
+        st.write("**Total Cargo, Baggage & Mail Input (kg):**")
+        total_cargo_input = st.number_input("Total Cargo Input (kg):", min_value=0, max_value=15000, value=0, step=50)
+
+        # --- AUTO DISTRIBUTION CALCULATION FOR INITIAL HOLDS ---
+        h1_def = min(int(LIMITS["HOLD1_MAX"]), round(total_cargo_input * 0.20))
+        h2_def = min(int(LIMITS["HOLD2_MAX"]), round(total_cargo_input * 0.35))
+        h3_def = min(int(LIMITS["HOLD3_MAX"]), round(total_cargo_input * 0.35))
+        h4_def = min(int(LIMITS["HOLD4_MAX"]), max(0, total_cargo_input - (h1_def + h2_def + h3_def)))
+
+        st.markdown("---")
+        st.write("**Cargo Holds Loading (kg) - Auto Distributed & Fully Editable:**")
         hc1, hc2 = st.columns(2)
         with hc1:
-            c1 = st.number_input("Hold 1 (FWD Upper):", min_value=0, max_value=int(LIMITS["HOLD1_MAX"]), value=0, step=50)
-            c2 = st.number_input("Hold 2 (FWD Lower):", min_value=0, max_value=int(LIMITS["HOLD2_MAX"]), value=0, step=50)
+            c1 = st.number_input("Hold 1 (FWD Upper):", min_value=0, max_value=int(LIMITS["HOLD1_MAX"]), value=h1_def, step=50)
+            c2 = st.number_input("Hold 2 (FWD Lower):", min_value=0, max_value=int(LIMITS["HOLD2_MAX"]), value=h2_def, step=50)
         with hc2:
-            c3 = st.number_input("Hold 3 (AFT Lower):", min_value=0, max_value=int(LIMITS["HOLD3_MAX"]), value=0, step=50)
-            c4 = st.number_input("Hold 4 (AFT Upper):", min_value=0, max_value=int(LIMITS["HOLD4_MAX"]), value=0, step=50)
+            c3 = st.number_input("Hold 3 (AFT Lower):", min_value=0, max_value=int(LIMITS["HOLD3_MAX"]), value=h3_def, step=50)
+            c4 = st.number_input("Hold 4 (AFT Upper):", min_value=0, max_value=int(LIMITS["HOLD4_MAX"]), value=h4_def, step=50)
         
         st.markdown("---")
         st.write("**Fuel Management (kg):**")
@@ -581,7 +591,7 @@ elif st.session_state.current_page == "WNB_Engine":
                 showlegend=False
             )
 
-            st.plotly_chart(fig_3d, use_container_width=True, key="sudan_fleet_3d_v_full")
+            st.plotly_chart(fig_3d, use_container_width=True, key="sudan_fleet_3d_v_perfect")
 
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("### Cabin Seating & Hold Status:")
