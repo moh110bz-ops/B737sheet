@@ -114,14 +114,25 @@ with col_visual:
     # تحديد ألوان حالة الأوزان والـ %MAC
     is_zfw_safe = zfw <= LIMITS["MZFW"]
     is_tow_safe = tow <= LIMITS["MTOW"]
+    is_lw_safe = lw <= LIMITS["MLW"]
     is_mac_safe = LIMITS["MAC_MIN"] <= mac_percent <= LIMITS["MAC_MAX"]
     
     st.info(f"إجمالي الركاب: {total_pax} | إجمالي الشحن: {total_cargo_wt} kg")
     
+    # عرض الأوزان والحدود الأقصى بصورة واضحة
     m1, m2, m3 = st.columns(3)
-    m1.metric("ZFW (kg)", f"{zfw:,}", "آمن" if is_zfw_safe else f"تجاوز! (+{zfw - LIMITS['MZFW']}kg)", delta_color="normal" if is_zfw_safe else "inverse")
-    m2.metric("TOW (kg)", f"{tow:,}", "آمن" if is_tow_safe else f"تجاوز! (+{tow - LIMITS['MTOW']}kg)", delta_color="normal" if is_tow_safe else "inverse")
-    m3.metric("Landing Wt (kg)", f"{lw:,}", f"الحد الأقصى: {LIMITS['MLW']:,}")
+    
+    with m1:
+        st.caption(f"**ZFW (Max: {LIMITS['MZFW']:,} kg)**")
+        st.metric(label="Zero Fuel Wt", value=f"{zfw:,} kg", delta="آمن" if is_zfw_safe else f"تجاوز (+{zfw - LIMITS['MZFW']} kg)", delta_color="normal" if is_zfw_safe else "inverse")
+        
+    with m2:
+        st.caption(f"**TOW (Max: {LIMITS['MTOW']:,} kg)**")
+        st.metric(label="Takeoff Wt", value=f"{tow:,} kg", delta="آمن" if is_tow_safe else f"تجاوز (+{tow - LIMITS['MTOW']} kg)", delta_color="normal" if is_tow_safe else "inverse")
+        
+    with m3:
+        st.caption(f"**LW (Max: {LIMITS['MLW']:,} kg)**")
+        st.metric(label="Landing Wt", value=f"{lw:,} kg", delta="آمن" if is_lw_safe else f"تجاوز (+{lw - LIMITS['MLW']} kg)", delta_color="normal" if is_lw_safe else "inverse")
     
     st.markdown("---")
     st.write("**مركز الثقل عند الإقلاع (%MAC):**")
@@ -142,7 +153,6 @@ with col_visual:
     st.markdown("---")
     st.subheader("محرك التغيرات اللحظية واقتراح التوزيع (LMC Engine)")
     
-    # إدخال رقمي مباشر للـ LMC مع أزرار +/-
     lmc_pax = st.number_input("تعديل ركاب لحظي (+/- Pax):", min_value=-50, max_value=50, value=0, step=1)
     lmc_cargo = st.number_input("تعديل أمتعة/شحن لحظي (+/- Cargo kg):", min_value=-2000, max_value=2000, value=0, step=5)
     
