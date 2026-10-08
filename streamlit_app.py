@@ -2,7 +2,7 @@ import streamlit as st
 import plotly.graph_objects as go
 import numpy as np
 
-st.set_page_config(page_title="AirSheet - Fleet & Load Control", layout="wide")
+st.set_page_config(page_title="AirSheet - Sudan Fleet & Load Control", layout="wide")
 
 st.markdown("""
 <style>
@@ -48,8 +48,80 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# --- SUDAN 5 COMMON AIRCRAFT TYPES PRE-CONFIGURED DATABASE ---
 if "fleet_db" not in st.session_state:
-    st.session_state.fleet_db = {}
+    st.session_state.fleet_db = {
+        "ST-BDG": {
+            "registration": "ST-BDG",
+            "airline": "Bader Airlines",
+            "type": "B737-800",
+            "status": "Operational",
+            "dow": 43550,
+            "doi": 48.2,
+            "is_restricted": False,
+            "limits": {
+                "MTOW": 79015, "MZFW": 62731, "MLW": 65317,
+                "HOLD1_MAX": 2268, "HOLD2_MAX": 3206, "HOLD3_MAX": 4241, "HOLD4_MAX": 2857,
+                "MAC_MIN": 8.0, "MAC_MAX": 33.0, "CAP_A": 60, "CAP_B": 60, "CAP_C": 69
+            }
+        },
+        "ST-TRK": {
+            "registration": "ST-TRK",
+            "airline": "Tarco Aviation",
+            "type": "B737-300",
+            "status": "Operational",
+            "dow": 32800,
+            "doi": 42.1,
+            "is_restricted": False,
+            "limits": {
+                "MTOW": 62820, "MZFW": 51710, "MLW": 54885,
+                "HOLD1_MAX": 1500, "HOLD2_MAX": 2500, "HOLD3_MAX": 3000, "HOLD4_MAX": 1200,
+                "MAC_MIN": 10.0, "MAC_MAX": 30.0, "CAP_A": 40, "CAP_B": 45, "CAP_C": 43
+            }
+        },
+        "ST-AZB": {
+            "registration": "ST-AZB",
+            "airline": "Sudan Airways",
+            "type": "B737-500",
+            "status": "Operational",
+            "dow": 31500,
+            "doi": 39.4,
+            "is_restricted": False,
+            "limits": {
+                "MTOW": 60550, "MZFW": 49895, "MLW": 53070,
+                "HOLD1_MAX": 1200, "HOLD2_MAX": 2200, "HOLD3_MAX": 2800, "HOLD4_MAX": 1000,
+                "MAC_MIN": 9.0, "MAC_MAX": 31.0, "CAP_A": 35, "CAP_B": 40, "CAP_C": 36
+            }
+        },
+        "ST-ABW": {
+            "registration": "ST-ABW",
+            "airline": "Abyssinia Flight",
+            "type": "A320",
+            "status": "Operational",
+            "dow": 42600,
+            "doi": 45.0,
+            "is_restricted": False,
+            "limits": {
+                "MTOW": 77000, "MZFW": 62500, "MLW": 66000,
+                "HOLD1_MAX": 2000, "HOLD2_MAX": 3500, "HOLD3_MAX": 3500, "HOLD4_MAX": 1500,
+                "MAC_MIN": 12.0, "MAC_MAX": 38.0, "CAP_A": 50, "CAP_B": 60, "CAP_C": 70
+            }
+        },
+        "ST-ATR": {
+            "registration": "ST-ATR",
+            "airline": "Domestic Regional",
+            "type": "ATR 72",
+            "status": "Operational",
+            "dow": 13000,
+            "doi": 25.0,
+            "is_restricted": False,
+            "limits": {
+                "MTOW": 23000, "MZFW": 21500, "MLW": 22350,
+                "HOLD1_MAX": 800, "HOLD2_MAX": 0, "HOLD3_MAX": 1200, "HOLD4_MAX": 0,
+                "MAC_MIN": 15.0, "MAC_MAX": 35.0, "CAP_A": 24, "CAP_B": 24, "CAP_C": 24
+            }
+        }
+    }
 
 if "selected_tail" not in st.session_state:
     st.session_state.selected_tail = None
@@ -130,9 +202,9 @@ elif st.session_state.current_page == "Add_Aircraft":
     st.title("Add New Aircraft to Fleet")
     st.caption("Register a new tail profile with specific DOW, DOI, and structural or MEL operational limits.")
     
-    new_reg = st.text_input("Registration / Tail Number:", value="", placeholder="ST-BDG").strip().upper()
-    new_operator = st.text_input("Airline / Operator:", value="", placeholder="Bader Airlines")
-    new_type = st.selectbox("Aircraft Type:", ["B737-300", "B737-500", "B737-800", "A320", "ATR 72"])
+    new_reg = st.text_input("Registration / Tail Number:", value="", placeholder="ST-SUD").strip().upper()
+    new_operator = st.text_input("Airline / Operator:", value="", placeholder="Sudan Airline Operator")
+    new_type = st.selectbox("Aircraft Type:", ["B737-800", "B737-500", "B737-300", "A320", "ATR 72"])
     
     new_dow = st.number_input("Dry Operating Weight (DOW kg):", value=0.0, step=100.0, format="%.1f")
     new_doi = st.number_input("Dry Operating Index (DOI):", value=0.0, step=0.1, format="%.1f")
@@ -263,7 +335,6 @@ elif st.session_state.current_page == "WNB_Engine":
     with col_input:
         st.subheader("1. Flight & Load Inputs")
         
-        # Display Baseline DOW and DOI as fixed aircraft profile data (non-editable here for safety)
         st.info(f"**Aircraft Baseline Profile:**\n\n• Dry Operating Weight (DOW): **{ac_data['dow']:,} kg**\n\n• Dry Operating Index (DOI): **{ac_data['doi']}**")
         dow = float(ac_data["dow"])
         doi = float(ac_data["doi"])
@@ -273,11 +344,11 @@ elif st.session_state.current_page == "WNB_Engine":
         
         c_pax1, c_pax2, c_pax3 = st.columns(3)
         with c_pax1:
-            num_adults = st.number_input("Adults (84 kg):", min_value=0, max_value=170, value=0, step=1)
+            num_adults = st.number_input("Adults (84 kg):", min_value=0, max_value=200, value=0, step=1)
         with c_pax2:
-            num_children = st.number_input("Children (35 kg):", min_value=0, max_value=50, value=0, step=1)
+            num_children = st.number_input("Children (35 kg):", min_value=0, max_value=60, value=0, step=1)
         with c_pax3:
-            num_infants = st.number_input("Infants (10 kg):", min_value=0, max_value=20, value=0, step=1)
+            num_infants = st.number_input("Infants (10 kg):", min_value=0, max_value=30, value=0, step=1)
             
         total_pax_seats = num_adults + num_children
         
@@ -291,7 +362,6 @@ elif st.session_state.current_page == "WNB_Engine":
         trip_fuel = st.number_input("Trip Fuel:", value=0.0, step=100.0)
 
     # --- AUTOMATIC SMART LOAD ALLOCATION ENGINE ---
-    # 1. Passenger Cabin Zone Auto-Allocation Ratio (Standard distribution: Zone A ~48%, Zone B ~38%, Zone C ~14%)
     cap_a = LIMITS["CAP_A"]
     cap_b = LIMITS["CAP_B"]
     cap_c = LIMITS["CAP_C"]
@@ -301,7 +371,6 @@ elif st.session_state.current_page == "WNB_Engine":
     pax_b = min(cap_b, int(total_pax_seats * (cap_b / total_cap)))
     pax_c = max(0, total_pax_seats - (pax_a + pax_b))
 
-    # 2. Cargo Holds Auto-Allocation Ratio (Standard distribution across FWD & AFT holds)
     h1_max = LIMITS["HOLD1_MAX"]
     h2_max = LIMITS["HOLD2_MAX"]
     h3_max = LIMITS["HOLD3_MAX"]
@@ -312,7 +381,6 @@ elif st.session_state.current_page == "WNB_Engine":
     c3 = min(h3_max, round(total_cargo_input * 0.35))
     c4 = max(0, total_cargo_input - (c1 + c2 + c3))
 
-    # 1. Structural Mass Calculations
     total_pax_wt = (num_adults * PAX_WEIGHTS["ADULT"]) + (num_children * PAX_WEIGHTS["CHILD"]) + (num_infants * PAX_WEIGHTS["INFANT"])
     total_cargo_wt = c1 + c2 + c3 + c4
 
@@ -320,7 +388,6 @@ elif st.session_state.current_page == "WNB_Engine":
     tow = zfw + to_fuel
     lw = tow - trip_fuel
 
-    # 2. Zone Breakdown Calculation
     actual_seated_pax = pax_a + pax_b + pax_c
     if actual_seated_pax > 0:
         ratio_a = pax_a / actual_seated_pax
@@ -513,7 +580,7 @@ elif st.session_state.current_page == "WNB_Engine":
                 showlegend=False
             )
 
-            st.plotly_chart(fig_3d, use_container_width=True, key="b737_3d_engine_v9")
+            st.plotly_chart(fig_3d, use_container_width=True, key="sudan_fleet_3d_v1")
 
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("### Automatic Cabin & Cargo Distribution:")
