@@ -2,7 +2,7 @@ import streamlit as st
 import plotly.graph_objects as go
 import numpy as np
 
-st.set_page_config(page_title="AirSheet - Bader Airlines Fleet", layout="wide")
+st.set_page_config(page_title="AirSheet - Fleet & Load Control", layout="wide")
 
 st.markdown("""
 <style>
@@ -48,39 +48,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Fleet Database Session State
 if "fleet_db" not in st.session_state:
-    st.session_state.fleet_db = {
-        "ST-BDG": {
-            "registration": "ST-BDG",
-            "airline": "Bader Airlines",
-            "type": "B737-800",
-            "status": "Operational",
-            "dow": 43550,
-            "doi": 48.2,
-            "is_restricted": False,
-            "limits": {
-                "MTOW": 79015, "MZFW": 62731, "MLW": 65317,
-                "HOLD1_MAX": 2268, "HOLD2_MAX": 3206, "HOLD3_MAX": 4241, "HOLD4_MAX": 2857,
-                "MAC_MIN": 8.0, "MAC_MAX": 33.0, "CAP_A": 60, "CAP_B": 60, "CAP_C": 69
-            }
-        },
-        "ST-BDR": {
-            "registration": "ST-BDR",
-            "airline": "Bader Airlines",
-            "type": "B737-800",
-            "status": "Restricted (MEL/Derated)",
-            "dow": 43800,
-            "doi": 49.0,
-            "is_restricted": True,
-            "restriction_reason": "Brake System Penalty (Derated MTOW)",
-            "limits": {
-                "MTOW": 75000, "MZFW": 61000, "MLW": 63000,
-                "HOLD1_MAX": 2000, "HOLD2_MAX": 3000, "HOLD3_MAX": 4000, "HOLD4_MAX": 2500,
-                "MAC_MIN": 8.0, "MAC_MAX": 33.0, "CAP_A": 60, "CAP_B": 60, "CAP_C": 69
-            }
-        }
-    }
+    st.session_state.fleet_db = {}
 
 if "selected_tail" not in st.session_state:
     st.session_state.selected_tail = None
@@ -88,7 +57,6 @@ if "selected_tail" not in st.session_state:
 if "current_page" not in st.session_state:
     st.session_state.current_page = "Home"
 
-# TOP NAVIGATION BAR
 nav_col1, nav_col2, nav_col3 = st.columns([2, 1, 1])
 
 with nav_col1:
@@ -119,12 +87,10 @@ MAC_LENGTH = 3.713
 # ==============================================================================
 if st.session_state.current_page == "Home":
     
-    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Bader_Airlines_logo.png/600px-Bader_Airlines_logo.png", width=220)
-    
     st.markdown('<div class="hero-title">AirSheet Flight Dispatch & Load Control Engine</div>', unsafe_allow_html=True)
     st.markdown(
         '<div class="hero-subtitle">'
-        'Welcome to Bader Airlines Advanced Fleet Weight & Balance Control System.<br>'
+        'Advanced Fleet Weight & Balance and Operational Load Management System.<br>'
         'Where aviation engineering precision meets the highest standards of flight safety.'
         '</div>', 
         unsafe_allow_html=True
@@ -136,30 +102,33 @@ if st.session_state.current_page == "Home":
     
     with c_search_2:
         st.subheader("Search Aircraft to Launch Calculations:")
-        search_query = st.text_input("Enter Tail Registration (e.g. ST-BDG):", "").strip().upper()
+        search_query = st.text_input("Enter Tail Registration:", value="", placeholder="ST-BDG", key="home_search").strip().upper()
         
         available_tails = list(st.session_state.fleet_db.keys())
         
-        if search_query:
-            matched_tails = [t for t in available_tails if search_query in t]
-        else:
-            matched_tails = available_tails
+        if available_tails:
+            if search_query:
+                matched_tails = [t for t in available_tails if search_query in t]
+            else:
+                matched_tails = available_tails
 
-        if matched_tails:
-            selected_tail_choice = st.selectbox("Select Aircraft from Fleet:", matched_tails)
-            
-            ac_info = st.session_state.fleet_db[selected_tail_choice]
-            st.info(f"**Operator:** {ac_info['airline']} | **Type:** {ac_info['type']} | **Base DOW:** {ac_info['dow']:,} kg")
-            
-            if ac_info["is_restricted"]:
-                st.warning(f"⚠️ **Operational Restriction Active:** {ac_info.get('restriction_reason', 'MEL Limits')}")
-            
-            if st.button("Launch Loadsheet & Calculations", use_container_width=True):
-                st.session_state.selected_tail = selected_tail_choice
-                st.session_state.current_page = "WNB_Engine"
-                st.rerun()
+            if matched_tails:
+                selected_tail_choice = st.selectbox("Select Aircraft from Fleet:", matched_tails)
+                
+                ac_info = st.session_state.fleet_db[selected_tail_choice]
+                st.info(f"**Operator:** {ac_info['airline']} | **Type:** {ac_info['type']} | **Base DOW:** {ac_info['dow']:,} kg")
+                
+                if ac_info["is_restricted"]:
+                    st.warning(f"⚠️ **Operational Restriction Active:** {ac_info.get('restriction_reason', 'MEL Limits')}")
+                
+                if st.button("Launch Loadsheet & Calculations", use_container_width=True):
+                    st.session_state.selected_tail = selected_tail_choice
+                    st.session_state.current_page = "WNB_Engine"
+                    st.rerun()
+            else:
+                st.warning("No aircraft found matching this registration search.")
         else:
-            st.warning("No aircraft found matching this registration. You can add it using the 'Add New Aircraft' button above.")
+            st.info("No aircraft registered in the system yet. Please click 'Add New Aircraft' above to start.")
 
 
 # ==============================================================================
@@ -169,11 +138,12 @@ elif st.session_state.current_page == "Add_Aircraft":
     st.title("Add New Aircraft to Fleet")
     st.caption("Register a new tail profile with specific DOW, DOI, and structural or MEL operational limits.")
     
-    new_reg = st.text_input("Registration / Tail Number:", placeholder="e.g. ST-BDS").strip().upper()
-    new_operator = st.text_input("Airline / Operator:", "Bader Airlines")
-    new_type = st.selectbox("Aircraft Type:", ["B737-800"])
-    new_dow = st.number_input("Dry Operating Weight (DOW kg):", value=43550, step=100)
-    new_doi = st.number_input("Dry Operating Index (DOI):", value=48.2, step=0.1)
+    new_reg = st.text_input("Registration / Tail Number:", value="", placeholder="ST-BDG").strip().upper()
+    new_operator = st.text_input("Airline / Operator:", value="", placeholder="Bader Airlines")
+    new_type = st.selectbox("Aircraft Type:", ["B737-300", "B737-500", "B737-800", "A320", "ATR 72"])
+    
+    new_dow = st.number_input("Dry Operating Weight (DOW kg):", value=0.0, step=100.0, format="%.1f")
+    new_doi = st.number_input("Dry Operating Index (DOI):", value=0.0, step=0.1, format="%.1f")
     
     limit_mode = st.radio(
         "Structural Limit Mode:",
@@ -190,18 +160,18 @@ elif st.session_state.current_page == "Add_Aircraft":
         restr_reason = ""
     else:
         is_restr = True
-        restr_reason = st.text_input("Restriction / Defect Reason (MEL):", "Brake Limitation Penalty")
+        restr_reason = st.text_input("Restriction / Defect Reason (MEL):", value="", placeholder="Brake Limitation Penalty")
         c1, c2, c3 = st.columns(3)
         with c1:
-            mtow_v = st.number_input("Max Takeoff Weight (MTOW kg):", value=75000, step=500)
-            h1_v = st.number_input("Hold 1 Max Limit (kg):", value=2000, step=100)
-            h2_v = st.number_input("Hold 2 Max Limit (kg):", value=3000, step=100)
+            mtow_v = st.number_input("Max Takeoff Weight (MTOW kg):", value=0, step=500)
+            h1_v = st.number_input("Hold 1 Max Limit (kg):", value=0, step=100)
+            h2_v = st.number_input("Hold 2 Max Limit (kg):", value=0, step=100)
         with c2:
-            mzfw_v = st.number_input("Max Zero Fuel Weight (MZFW kg):", value=61000, step=500)
-            h3_v = st.number_input("Hold 3 Max Limit (kg):", value=4000, step=100)
+            mzfw_v = st.number_input("Max Zero Fuel Weight (MZFW kg):", value=0, step=500)
+            h3_v = st.number_input("Hold 3 Max Limit (kg):", value=0, step=100)
         with c3:
-            mlw_v = st.number_input("Max Landing Weight (MLW kg):", value=63000, step=500)
-            h4_v = st.number_input("Hold 4 Max Limit (kg):", value=2500, step=100)
+            mlw_v = st.number_input("Max Landing Weight (MLW kg):", value=0, step=500)
+            h4_v = st.number_input("Hold 4 Max Limit (kg):", value=0, step=100)
             
         limits_data = {
             "MTOW": mtow_v, "MZFW": mzfw_v, "MLW": mlw_v,
@@ -213,7 +183,7 @@ elif st.session_state.current_page == "Add_Aircraft":
         if new_reg:
             st.session_state.fleet_db[new_reg] = {
                 "registration": new_reg,
-                "airline": new_operator,
+                "airline": new_operator if new_operator else "Independent Operator",
                 "type": new_type,
                 "status": "Restricted (MEL/Derated)" if is_restr else "Operational",
                 "dow": new_dow,
@@ -237,41 +207,44 @@ elif st.session_state.current_page == "Edit_Aircraft":
     st.caption("Update weights and operational limitations in case of maintenance or technical restrictions.")
     
     available_tails = list(st.session_state.fleet_db.keys())
-    target_tail = st.selectbox("Select Aircraft to Edit:", available_tails)
     
-    ac_target = st.session_state.fleet_db[target_tail]
-    
-    e_dow = st.number_input("Updated DOW (kg):", value=ac_target["dow"], step=100)
-    e_doi = st.number_input("Updated DOI:", value=ac_target["doi"], step=0.1)
-    
-    e_restricted = st.checkbox("Apply Operational Restriction / Technical Defect", value=ac_target["is_restricted"])
-    
-    if e_restricted:
-        e_reason = st.text_input("Restriction Reason:", ac_target.get("restriction_reason", ""))
-        ec1, ec2, ec3 = st.columns(3)
-        with ec1:
-            e_mtow = st.number_input("MTOW Limit (kg):", value=ac_target["limits"]["MTOW"], step=500)
-        with ec2:
-            e_mzfw = st.number_input("MZFW Limit (kg):", value=ac_target["limits"]["MZFW"], step=500)
-        with ec3:
-            e_mlw = st.number_input("MLW Limit (kg):", value=ac_target["limits"]["MLW"], step=500)
-    else:
-        e_reason = ""
-        e_mtow, e_mzfw, e_mlw = 79015, 62731, 65317
-
-    if st.button("Update Aircraft Profile"):
-        st.session_state.fleet_db[target_tail]["dow"] = e_dow
-        st.session_state.fleet_db[target_tail]["doi"] = e_doi
-        st.session_state.fleet_db[target_tail]["is_restricted"] = e_restricted
-        st.session_state.fleet_db[target_tail]["status"] = "Restricted (MEL/Derated)" if e_restricted else "Operational"
-        st.session_state.fleet_db[target_tail]["restriction_reason"] = e_reason
-        st.session_state.fleet_db[target_tail]["limits"]["MTOW"] = e_mtow
-        st.session_state.fleet_db[target_tail]["limits"]["MZFW"] = e_mzfw
-        st.session_state.fleet_db[target_tail]["limits"]["MLW"] = e_mlw
+    if available_tails:
+        target_tail = st.selectbox("Select Aircraft to Edit:", available_tails)
+        ac_target = st.session_state.fleet_db[target_tail]
         
-        st.success(f"Aircraft {target_tail} successfully updated!")
-        st.session_state.current_page = "Home"
-        st.rerun()
+        e_dow = st.number_input("Updated DOW (kg):", value=float(ac_target["dow"]), step=100.0)
+        e_doi = st.number_input("Updated DOI:", value=float(ac_target["doi"]), step=0.1)
+        
+        e_restricted = st.checkbox("Apply Operational Restriction / Technical Defect", value=ac_target["is_restricted"])
+        
+        if e_restricted:
+            e_reason = st.text_input("Restriction Reason:", value=ac_target.get("restriction_reason", ""))
+            ec1, ec2, ec3 = st.columns(3)
+            with ec1:
+                e_mtow = st.number_input("MTOW Limit (kg):", value=int(ac_target["limits"]["MTOW"]), step=500)
+            with ec2:
+                e_mzfw = st.number_input("MZFW Limit (kg):", value=int(ac_target["limits"]["MZFW"]), step=500)
+            with ec3:
+                e_mlw = st.number_input("MLW Limit (kg):", value=int(ac_target["limits"]["MLW"]), step=500)
+        else:
+            e_reason = ""
+            e_mtow, e_mzfw, e_mlw = 79015, 62731, 65317
+
+        if st.button("Update Aircraft Profile"):
+            st.session_state.fleet_db[target_tail]["dow"] = e_dow
+            st.session_state.fleet_db[target_tail]["doi"] = e_doi
+            st.session_state.fleet_db[target_tail]["is_restricted"] = e_restricted
+            st.session_state.fleet_db[target_tail]["status"] = "Restricted (MEL/Derated)" if e_restricted else "Operational"
+            st.session_state.fleet_db[target_tail]["restriction_reason"] = e_reason
+            st.session_state.fleet_db[target_tail]["limits"]["MTOW"] = e_mtow
+            st.session_state.fleet_db[target_tail]["limits"]["MZFW"] = e_mzfw
+            st.session_state.fleet_db[target_tail]["limits"]["MLW"] = e_mlw
+            
+            st.success(f"Aircraft {target_tail} successfully updated!")
+            st.session_state.current_page = "Home"
+            st.rerun()
+    else:
+        st.warning("No aircraft available in the fleet to edit. Please add an aircraft first.")
 
 
 # ==============================================================================
@@ -287,8 +260,8 @@ elif st.session_state.current_page == "WNB_Engine":
     ac_data = st.session_state.fleet_db[active_tail]
     LIMITS = ac_data["limits"]
 
-    st.title(f"AirSheet Engine - B737-800 [{active_tail}]")
-    st.caption(f"Operator: {ac_data['airline']} | Status: {ac_data['status']}")
+    st.title(f"AirSheet Engine - [{active_tail}]")
+    st.caption(f"Operator: {ac_data['airline']} | Type: {ac_data['type']} | Status: {ac_data['status']}")
     
     if ac_data["is_restricted"]:
         st.warning(f"⚠️ **Active Operational Limitations:** {ac_data.get('restriction_reason', 'MEL Derated')}")
@@ -298,19 +271,19 @@ elif st.session_state.current_page == "WNB_Engine":
     with col_input:
         st.subheader("1. Flight & Load Inputs")
         
-        dow = st.number_input("Dry Operating Weight (DOW kg):", value=ac_data["dow"], step=100)
-        doi = st.number_input("Dry Operating Index (DOI):", value=ac_data["doi"], step=0.1)
+        dow = st.number_input("Dry Operating Weight (DOW kg):", value=float(ac_data["dow"]), step=100.0)
+        doi = st.number_input("Dry Operating Index (DOI):", value=float(ac_data["doi"]), step=0.1)
         
         st.markdown("---")
         st.write("**Passenger Demographics:**")
         
         c_pax1, c_pax2, c_pax3 = st.columns(3)
         with c_pax1:
-            num_adults = st.number_input("Adults (84 kg):", min_value=0, max_value=170, value=130, step=1)
+            num_adults = st.number_input("Adults (84 kg):", min_value=0, max_value=170, value=0, step=1)
         with c_pax2:
-            num_children = st.number_input("Children (35 kg):", min_value=0, max_value=50, value=10, step=1)
+            num_children = st.number_input("Children (35 kg):", min_value=0, max_value=50, value=0, step=1)
         with c_pax3:
-            num_infants = st.number_input("Infants (10 kg):", min_value=0, max_value=20, value=3, step=1)
+            num_infants = st.number_input("Infants (10 kg):", min_value=0, max_value=20, value=0, step=1)
             
         total_pax_seats = num_adults + num_children
         
@@ -319,13 +292,13 @@ elif st.session_state.current_page == "WNB_Engine":
         if auto_distribute:
             rem_seats = total_pax_seats
             
-            pax_b = min(LIMITS["CAP_B"], int(rem_seats * 0.38))
+            pax_b = min(LIMITS["CAP_B"], int(rem_seats * 0.38)) if rem_seats > 0 else 0
             rem_seats -= pax_b
             
-            pax_a = min(LIMITS["CAP_A"], int(rem_seats * 0.48))
+            pax_a = min(LIMITS["CAP_A"], int(rem_seats * 0.48)) if rem_seats > 0 else 0
             rem_seats -= pax_a
             
-            pax_c = min(LIMITS["CAP_C"], rem_seats)
+            pax_c = min(LIMITS["CAP_C"], rem_seats) if rem_seats > 0 else 0
             
             actual_seated_pax = pax_a + pax_b + pax_c
             if actual_seated_pax > 0:
@@ -355,21 +328,21 @@ elif st.session_state.current_page == "WNB_Engine":
             )
         else:
             st.write("**Manual Cabin Seating:**")
-            pax_a = st.number_input("Zone A (Rows 1-10):", min_value=0, max_value=LIMITS["CAP_A"], value=38, step=1)
-            pax_b = st.number_input("Zone B (Rows 11-20):", min_value=0, max_value=LIMITS["CAP_B"], value=52, step=1)
-            pax_c = st.number_input("Zone C (Rows 21-33):", min_value=0, max_value=LIMITS["CAP_C"], value=50, step=1)
+            pax_a = st.number_input("Zone A (Rows 1-10):", min_value=0, max_value=LIMITS["CAP_A"], value=0, step=1)
+            pax_b = st.number_input("Zone B (Rows 11-20):", min_value=0, max_value=LIMITS["CAP_B"], value=0, step=1)
+            pax_c = st.number_input("Zone C (Rows 21-33):", min_value=0, max_value=LIMITS["CAP_C"], value=0, step=1)
 
         st.markdown("---")
         st.write("**Cargo Holds Loading (kg):**")
-        c1 = st.number_input("Hold 1 (FWD Upper):", min_value=0, max_value=LIMITS["HOLD1_MAX"], value=850, step=50)
-        c2 = st.number_input("Hold 2 (FWD Lower):", min_value=0, max_value=LIMITS["HOLD2_MAX"], value=1450, step=50)
-        c3 = st.number_input("Hold 3 (AFT Lower):", min_value=0, max_value=LIMITS["HOLD3_MAX"], value=1800, step=50)
-        c4 = st.number_input("Hold 4 (AFT Upper):", min_value=0, max_value=LIMITS["HOLD4_MAX"], value=450, step=50)
+        c1 = st.number_input("Hold 1 (FWD Upper):", min_value=0, max_value=LIMITS["HOLD1_MAX"], value=0, step=50)
+        c2 = st.number_input("Hold 2 (FWD Lower):", min_value=0, max_value=LIMITS["HOLD2_MAX"], value=0, step=50)
+        c3 = st.number_input("Hold 3 (AFT Lower):", min_value=0, max_value=LIMITS["HOLD3_MAX"], value=0, step=50)
+        c4 = st.number_input("Hold 4 (AFT Upper):", min_value=0, max_value=LIMITS["HOLD4_MAX"], value=0, step=50)
         
         st.markdown("---")
         st.write("**Fuel Management (kg):**")
-        to_fuel = st.number_input("Takeoff Fuel (TBOF):", value=10800, step=100)
-        trip_fuel = st.number_input("Trip Fuel:", value=7200, step=100)
+        to_fuel = st.number_input("Takeoff Fuel (TBOF):", value=0.0, step=100.0)
+        trip_fuel = st.number_input("Trip Fuel:", value=0.0, step=100.0)
 
     # 1. Structural Mass Calculations
     total_pax_wt = (num_adults * PAX_WEIGHTS["ADULT"]) + (num_children * PAX_WEIGHTS["CHILD"]) + (num_infants * PAX_WEIGHTS["INFANT"])
@@ -414,7 +387,7 @@ elif st.session_state.current_page == "WNB_Engine":
     total_takeoff_moment = dow_moment + pax_moment + cargo_moment + fuel_moment
 
     cg_meters = total_takeoff_moment / tow if tow > 0 else 0
-    mac_percent = ((cg_meters - LEMAC) / MAC_LENGTH) * 100.0
+    mac_percent = ((cg_meters - LEMAC) / MAC_LENGTH) * 100.0 if tow > 0 else 0.0
 
     with col_visual:
         display_mode = st.radio(
@@ -572,18 +545,18 @@ elif st.session_state.current_page == "WNB_Engine":
                 showlegend=False
             )
 
-            st.plotly_chart(fig_3d, use_container_width=True, key="b737_3d_engine_v5")
+            st.plotly_chart(fig_3d, use_container_width=True, key="b737_3d_engine_v7")
 
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("### Cabin Seating Visualizer:")
         
-        st.progress(pax_a / LIMITS["CAP_A"], text=f"Zone A: {pax_a} Pax")
+        st.progress(pax_a / LIMITS["CAP_A"] if LIMITS["CAP_A"] > 0 else 0, text=f"Zone A: {pax_a} Pax")
         st.markdown(f'<div class="pax-breakdown"><b>{a_adult} Adult / {a_child} Child / {a_infant} Infant</b></div>', unsafe_allow_html=True)
         
-        st.progress(pax_b / LIMITS["CAP_B"], text=f"Zone B: {pax_b} Pax")
+        st.progress(pax_b / LIMITS["CAP_B"] if LIMITS["CAP_B"] > 0 else 0, text=f"Zone B: {pax_b} Pax")
         st.markdown(f'<div class="pax-breakdown"><b>{b_adult} Adult / {b_child} Child / {b_infant} Infant</b></div>', unsafe_allow_html=True)
         
-        st.progress(pax_c / LIMITS["CAP_C"], text=f"Zone C: {pax_c} Pax")
+        st.progress(pax_c / LIMITS["CAP_C"] if LIMITS["CAP_C"] > 0 else 0, text=f"Zone C: {pax_c} Pax")
         st.markdown(f'<div class="pax-breakdown"><b>{c_adult} Adult / {c_child} Child / {c_infant} Infant</b></div>', unsafe_allow_html=True)
         
         st.markdown("---")
