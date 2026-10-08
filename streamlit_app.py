@@ -263,11 +263,13 @@ elif st.session_state.current_page == "WNB_Engine":
     with col_input:
         st.subheader("1. Flight & Load Inputs")
         
-        dow = st.number_input("Dry Operating Weight (DOW kg):", value=float(ac_data["dow"]), step=100.0)
-        doi = st.number_input("Dry Operating Index (DOI):", value=float(ac_data["doi"]), step=0.1)
+        # Display Baseline DOW and DOI as fixed aircraft profile data (non-editable here for safety)
+        st.info(f"**Aircraft Baseline Profile:**\n\n• Dry Operating Weight (DOW): **{ac_data['dow']:,} kg**\n\n• Dry Operating Index (DOI): **{ac_data['doi']}**")
+        dow = float(ac_data["dow"])
+        doi = float(ac_data["doi"])
         
         st.markdown("---")
-        st.write("**Passenger Demographics:**")
+        st.write("**Passenger Demographics (From Dispatch Message):**")
         
         c_pax1, c_pax2, c_pax3 = st.columns(3)
         with c_pax1:
@@ -279,62 +281,36 @@ elif st.session_state.current_page == "WNB_Engine":
             
         total_pax_seats = num_adults + num_children
         
-        auto_distribute = st.checkbox("Auto Seat Allocation Across Cabin", value=True)
-        
-        if auto_distribute:
-            rem_seats = total_pax_seats
-            
-            pax_b = min(LIMITS["CAP_B"], int(rem_seats * 0.38)) if rem_seats > 0 else 0
-            rem_seats -= pax_b
-            
-            pax_a = min(LIMITS["CAP_A"], int(rem_seats * 0.48)) if rem_seats > 0 else 0
-            rem_seats -= pax_a
-            
-            pax_c = min(LIMITS["CAP_C"], rem_seats) if rem_seats > 0 else 0
-            
-            actual_seated_pax = pax_a + pax_b + pax_c
-            if actual_seated_pax > 0:
-                ratio_a = pax_a / actual_seated_pax
-                ratio_b = pax_b / actual_seated_pax
-                ratio_c = pax_c / actual_seated_pax
-            else:
-                ratio_a = ratio_b = ratio_c = 0.33
-
-            a_adult = round(num_adults * ratio_a)
-            b_adult = round(num_adults * ratio_b)
-            c_adult = num_adults - (a_adult + b_adult)
-
-            a_child = round(num_children * ratio_a)
-            b_child = round(num_children * ratio_b)
-            c_child = num_children - (a_child + b_child)
-
-            a_infant = round(num_infants * ratio_a)
-            b_infant = round(num_infants * ratio_b)
-            c_infant = num_infants - (a_infant + b_infant)
-
-            st.info(
-                f"**Auto Allocated:**\n\n"
-                f"• **Zone A ({pax_a}):** {a_adult} Adult / {a_child} Child / {a_infant} Infant\n\n"
-                f"• **Zone B ({pax_b}):** {b_adult} Adult / {b_child} Child / {b_infant} Infant\n\n"
-                f"• **Zone C ({pax_c}):** {c_adult} Adult / {c_child} Child / {c_infant} Infant"
-            )
-        else:
-            st.write("**Manual Cabin Seating:**")
-            pax_a = st.number_input("Zone A (Rows 1-10):", min_value=0, max_value=LIMITS["CAP_A"], value=0, step=1)
-            pax_b = st.number_input("Zone B (Rows 11-20):", min_value=0, max_value=LIMITS["CAP_B"], value=0, step=1)
-            pax_c = st.number_input("Zone C (Rows 21-33):", min_value=0, max_value=LIMITS["CAP_C"], value=0, step=1)
-
         st.markdown("---")
-        st.write("**Cargo Holds Loading (kg):**")
-        c1 = st.number_input("Hold 1 (FWD Upper):", min_value=0, max_value=LIMITS["HOLD1_MAX"], value=0, step=50)
-        c2 = st.number_input("Hold 2 (FWD Lower):", min_value=0, max_value=LIMITS["HOLD2_MAX"], value=0, step=50)
-        c3 = st.number_input("Hold 3 (AFT Lower):", min_value=0, max_value=LIMITS["HOLD3_MAX"], value=0, step=50)
-        c4 = st.number_input("Hold 4 (AFT Upper):", min_value=0, max_value=LIMITS["HOLD4_MAX"], value=0, step=50)
+        st.write("**Total Cargo & Baggage Input (kg):**")
+        total_cargo_input = st.number_input("Total Cargo / Baggage Weight (kg):", min_value=0, max_value=15000, value=0, step=50)
         
         st.markdown("---")
         st.write("**Fuel Management (kg):**")
         to_fuel = st.number_input("Takeoff Fuel (TBOF):", value=0.0, step=100.0)
         trip_fuel = st.number_input("Trip Fuel:", value=0.0, step=100.0)
+
+    # --- AUTOMATIC SMART LOAD ALLOCATION ENGINE ---
+    # 1. Passenger Cabin Zone Auto-Allocation Ratio (Standard distribution: Zone A ~48%, Zone B ~38%, Zone C ~14%)
+    cap_a = LIMITS["CAP_A"]
+    cap_b = LIMITS["CAP_B"]
+    cap_c = LIMITS["CAP_C"]
+    total_cap = cap_a + cap_b + cap_c if (cap_a + cap_b + cap_c) > 0 else 189
+
+    pax_a = min(cap_a, int(total_pax_seats * (cap_a / total_cap)))
+    pax_b = min(cap_b, int(total_pax_seats * (cap_b / total_cap)))
+    pax_c = max(0, total_pax_seats - (pax_a + pax_b))
+
+    # 2. Cargo Holds Auto-Allocation Ratio (Standard distribution across FWD & AFT holds)
+    h1_max = LIMITS["HOLD1_MAX"]
+    h2_max = LIMITS["HOLD2_MAX"]
+    h3_max = LIMITS["HOLD3_MAX"]
+    h4_max = LIMITS["HOLD4_MAX"]
+    
+    c1 = min(h1_max, round(total_cargo_input * 0.20))
+    c2 = min(h2_max, round(total_cargo_input * 0.35))
+    c3 = min(h3_max, round(total_cargo_input * 0.35))
+    c4 = max(0, total_cargo_input - (c1 + c2 + c3))
 
     # 1. Structural Mass Calculations
     total_pax_wt = (num_adults * PAX_WEIGHTS["ADULT"]) + (num_children * PAX_WEIGHTS["CHILD"]) + (num_infants * PAX_WEIGHTS["INFANT"])
@@ -395,7 +371,7 @@ elif st.session_state.current_page == "WNB_Engine":
         is_lw_safe = lw <= LIMITS["MLW"]
         is_mac_safe = LIMITS["MAC_MIN"] <= mac_percent <= LIMITS["MAC_MAX"]
         
-        st.info(f"Total Pax: {total_pax_seats} (Adults: {num_adults} / Children: {num_children} / Infants: {num_infants}) | Total Cargo: {total_cargo_wt} kg")
+        st.info(f"Total Pax: {total_pax_seats} (Adults: {num_adults} / Children: {num_children} / Infants: {num_infants}) | Total Cargo: {total_cargo_wt:,} kg")
         
         m1, m2, m3 = st.columns(3)
         
@@ -537,19 +513,22 @@ elif st.session_state.current_page == "WNB_Engine":
                 showlegend=False
             )
 
-            st.plotly_chart(fig_3d, use_container_width=True, key="b737_3d_engine_v8")
+            st.plotly_chart(fig_3d, use_container_width=True, key="b737_3d_engine_v9")
 
         st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("### Cabin Seating Visualizer:")
+        st.markdown("### Automatic Cabin & Cargo Distribution:")
         
-        st.progress(pax_a / LIMITS["CAP_A"] if LIMITS["CAP_A"] > 0 else 0, text=f"Zone A: {pax_a} Pax")
+        st.progress(pax_a / LIMITS["CAP_A"] if LIMITS["CAP_A"] > 0 else 0, text=f"Zone A: {pax_a} Pax (Max {LIMITS['CAP_A']})")
         st.markdown(f'<div class="pax-breakdown"><b>{a_adult} Adult / {a_child} Child / {a_infant} Infant</b></div>', unsafe_allow_html=True)
         
-        st.progress(pax_b / LIMITS["CAP_B"] if LIMITS["CAP_B"] > 0 else 0, text=f"Zone B: {pax_b} Pax")
+        st.progress(pax_b / LIMITS["CAP_B"] if LIMITS["CAP_B"] > 0 else 0, text=f"Zone B: {pax_b} Pax (Max {LIMITS['CAP_B']})")
         st.markdown(f'<div class="pax-breakdown"><b>{b_adult} Adult / {b_child} Child / {b_infant} Infant</b></div>', unsafe_allow_html=True)
         
-        st.progress(pax_c / LIMITS["CAP_C"] if LIMITS["CAP_C"] > 0 else 0, text=f"Zone C: {pax_c} Pax")
+        st.progress(pax_c / LIMITS["CAP_C"] if LIMITS["CAP_C"] > 0 else 0, text=f"Zone C: {pax_c} Pax (Max {LIMITS['CAP_C']})")
         st.markdown(f'<div class="pax-breakdown"><b>{c_adult} Adult / {c_child} Child / {c_infant} Infant</b></div>', unsafe_allow_html=True)
+
+        st.markdown("---")
+        st.write(f"**Automatically Distributed Holds:** Hold 1: {c1}kg | Hold 2: {c2}kg | Hold 3: {c3}kg | Hold 4: {c4}kg")
         
         st.markdown("---")
         st.subheader("Last Minute Changes (LMC Engine)")
@@ -567,22 +546,22 @@ elif st.session_state.current_page == "WNB_Engine":
             pax_suggestions = []
             if lmc_pax > 0:
                 rem_pax = lmc_pax
-                cap_a = LIMITS["CAP_A"] - pax_a
-                cap_b = LIMITS["CAP_B"] - pax_b
-                cap_c = LIMITS["CAP_C"] - pax_c
+                cap_a_rem = LIMITS["CAP_A"] - pax_a
+                cap_b_rem = LIMITS["CAP_B"] - pax_b
+                cap_c_rem = LIMITS["CAP_C"] - pax_c
                 
                 alloc_a, alloc_b, alloc_c = 0, 0, 0
                 
                 for _ in range(rem_pax):
-                    if cap_a >= cap_c and cap_a > 0:
+                    if cap_a_rem >= cap_c_rem and cap_a_rem > 0:
                         alloc_a += 1
-                        cap_a -= 1
-                    elif cap_c > cap_a and cap_c > 0:
-                        alloc_c += 1
-                        cap_c -= 1
-                    elif cap_b > 0:
+                        cap_a_rem -= 1
+                    elif cap_c_rem > cap_a_rem and cap_c_rem > 0:
+                        alloc_c_rem += 1
+                        cap_c_rem -= 1
+                    elif cap_b_rem > 0:
                         alloc_b += 1
-                        cap_b -= 1
+                        cap_b_rem -= 1
                     else:
                         alloc_a += 1
                         
@@ -605,4 +584,3 @@ elif st.session_state.current_page == "WNB_Engine":
                 cargo_suggestions.append(f"• Offload {abs(lmc_cargo)} kg from Hold 3 or Hold 2")
 
             st.success("\n".join(pax_suggestions + cargo_suggestions))
-            st.info("You can now update the main flight inputs above with these figures to finalize the Loadsheet.")
