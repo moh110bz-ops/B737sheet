@@ -30,7 +30,31 @@ MAC_LENGTH = 3.713
 
 st.set_page_config(page_title="AirSheet - B737-800", layout="wide")
 
-st.title("✈️ AirSheet: B737-800 Weight & Balance Engine")
+# تخصيص ألوان كروت الحالة (Badge Colors CSS)
+st.markdown("""
+<style>
+    .badge-safe {
+        background-color: #1e4620;
+        color: #4caf50;
+        padding: 6px 14px;
+        border-radius: 6px;
+        font-weight: bold;
+        display: inline-block;
+        border: 1px solid #2e7d32;
+    }
+    .badge-danger {
+        background-color: #5c1d1d;
+        color: #ff5252;
+        padding: 6px 14px;
+        border-radius: 6px;
+        font-weight: bold;
+        display: inline-block;
+        border: 1px solid #d32f2f;
+    }
+</style>
+""", unsafe_allow_syntax_gradient=True, unsafe_allow_html=True)
+
+st.title("AirSheet: B737-800 Weight & Balance Engine")
 st.caption("نظام التوزين والتوازن العملياتي لـ Boeing 737-800")
 
 col_input, col_visual = st.columns([1, 1])
@@ -48,7 +72,7 @@ with col_input:
     pax_c = st.slider("Zone C (الصف 21-33):", 0, 69, 58)
     
     st.markdown("---")
-    st.write("**توزيع العنابر الشحن (Cargo Holds kg):**")
+    st.write("**توزيع عنابر الشحن (Cargo Holds kg):**")
     c1 = st.number_input("Hold 1 (FWD Upper):", 0, LIMITS["HOLD1_MAX"], 850)
     c2 = st.number_input("Hold 2 (FWD Lower):", 0, LIMITS["HOLD2_MAX"], 1450)
     c3 = st.number_input("Hold 3 (AFT Lower):", 0, LIMITS["HOLD3_MAX"], 1800)
@@ -85,51 +109,58 @@ mac_percent = ((cg_meters - LEMAC) / MAC_LENGTH) * 100.0
 with col_visual:
     st.subheader("2. الشاشة البصرية لتوزيع الأحمال")
     
-    zfw_status = "✅ آمن" if zfw <= LIMITS["MZFW"] else f"🚨 إجهاد وزن! (+{zfw - LIMITS['MZFW']}kg)"
-    tow_status = "✅ آمن" if tow <= LIMITS["MTOW"] else f"🚨 إجهاد إقلاع! (+{tow - LIMITS['MTOW']}kg)"
-    mac_status = "✅ آمن (داخل الـ Envelope)" if LIMITS["MAC_MIN"] <= mac_percent <= LIMITS["MAC_MAX"] else "🚨 خارج النطاق!"
+    # تحديد ألوان حالة الأوزان والـ %MAC
+    is_zfw_safe = zfw <= LIMITS["MZFW"]
+    is_tow_safe = tow <= LIMITS["MTOW"]
+    is_mac_safe = LIMITS["MAC_MIN"] <= mac_percent <= LIMITS["MAC_MAX"]
     
-    st.info(f"**إجمالي الركاب:** {total_pax} | **إجمالي الشحن:** {total_cargo_wt} kg")
+    st.info(f"إجمالي الركاب: {total_pax} | إجمالي الشحن: {total_cargo_wt} kg")
     
     m1, m2, m3 = st.columns(3)
-    m1.metric("ZFW (kg)", f"{zfw:,}", zfw_status)
-    m2.metric("TOW (kg)", f"{tow:,}", tow_status)
-    m3.metric("Landing Wt (kg)", f"{lw:,}", f"Max: {LIMITS['MLW']:,}")
+    m1.metric("ZFW (kg)", f"{zfw:,}", "آمن" if is_zfw_safe else f"تجاوز! (+{zfw - LIMITS['MZFW']}kg)", delta_color="normal" if is_zfw_safe else "inverse")
+    m2.metric("TOW (kg)", f"{tow:,}", "آمن" if is_tow_safe else f"تجاوز! (+{tow - LIMITS['MTOW']}kg)", delta_color="normal" if is_tow_safe else "inverse")
+    m3.metric("Landing Wt (kg)", f"{lw:,}", f"الحد الأقصى: {LIMITS['MLW']:,}")
     
     st.markdown("---")
-    st.metric("مركز الثقل عند الإقلاع (%MAC)", f"{mac_percent:.2f}%", mac_status)
+    st.write("**مركز الثقل عند الإقلاع (%MAC):**")
+    st.title(f"{mac_percent:.2f}%")
     
-    st.markdown("### ✈️ توزيع الكابينة بصرياً:")
+    # مربع حالة مركز الثقل الملون
+    if is_mac_safe:
+        st.markdown('<div class="badge-safe">آمن (داخل نطاق Envelope)</div>', unsafe_allow_html=True)
+    else:
+        st.markdown('<div class="badge-danger">خارج النطاق</div>', unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("### توزيع الكابينة بصرياً:")
     st.progress(pax_a / 60, text=f"Zone A: {pax_a} Pax")
     st.progress(pax_b / 60, text=f"Zone B: {pax_b} Pax")
     st.progress(pax_c / 69, text=f"Zone C: {pax_c} Pax")
     
     st.markdown("---")
-    st.subheader("⚡ محرك التغيرات اللحظية واقتراح التوزيع (LMC Engine)")
+    st.subheader("محرك التغيرات اللحظية واقتراح التوزيع (LMC Engine)")
     
-    lmc_pax = st.number_input("تعديل ركاب لحظي (+/- Pax):", value=0)
-    lmc_cargo = st.number_input("تعديل أمتعة/شحن لحظي (+/- Cargo kg):", value=0)
+    # استخدام ستايل الإشارات لتعديلات الـ LMC
+    lmc_pax = st.slider("تعديل ركاب لحظي (+/- Pax):", -10, 10, 0, format="%+d راكب")
+    lmc_cargo = st.slider("تعديل أمتعة/شحن لحظي (+/- Cargo kg):", -200, 200, 0, step=5, format="%+d kg")
     
     if lmc_pax != 0 or lmc_cargo != 0:
         added_pax_wt = lmc_pax * 84
         new_tow = tow + added_pax_wt + lmc_cargo
-        st.warning(f"⚖️ **وزن الإقلاع الجديد بعد الـ LMC:** `{new_tow:,} kg` (التعديل: `{added_pax_wt + lmc_cargo:+} kg`)")
+        st.warning(f"وزن الإقلاع الجديد بعد الـ LMC: {new_tow:,} kg (التعديل: {added_pax_wt + lmc_cargo:+} kg)")
         
-        st.markdown("#### 💡 **مقترح التوزيع الذكي للـ LMC:**")
+        st.markdown("#### مقترح التوزيع الذكي للـ LMC:")
         
         # 1. اقتراح توزيع الركاب
         pax_suggestions = []
         if lmc_pax > 0:
             rem_pax = lmc_pax
-            # فحص السعة المتاحة في الزونات
             cap_a = 60 - pax_a
             cap_b = 60 - pax_b
             cap_c = 69 - pax_c
             
-            # الاقتراح الأول: توزيع على B أولاً للحياد ثم A و C
             alloc_a, alloc_b, alloc_c = 0, 0, 0
             
-            # توزيع التوازن
             for _ in range(rem_pax):
                 if cap_a >= cap_c and cap_a > 0:
                     alloc_a += 1
@@ -143,25 +174,25 @@ with col_visual:
                 else:
                     alloc_a += 1
                     
-            if alloc_a > 0: pax_suggestions.append(f"• ضع **{alloc_a} راكب** في **Zone A**")
-            if alloc_b > 0: pax_suggestions.append(f"• ضع **{alloc_b} راكب** في **Zone B**")
-            if alloc_c > 0: pax_suggestions.append(f"• ضع **{alloc_c} راكب** في **Zone C**")
+            if alloc_a > 0: pax_suggestions.append(f"• ضع {alloc_a}+ راكب في Zone A")
+            if alloc_b > 0: pax_suggestions.append(f"• ضع {alloc_b}+ راكب في Zone B")
+            if alloc_c > 0: pax_suggestions.append(f"• ضع {alloc_c}+ راكب في Zone C")
         elif lmc_pax < 0:
-            pax_suggestions.append(f"• قم بإلغاء **{abs(lmc_pax)} راكب** من المنطقة الأكثر ازدحاماً (Zone C أو Zone B)")
+            pax_suggestions.append(f"• إلغاء {abs(lmc_pax)} راكب من المنطقة الأكثر ازدحاماً (Zone C أو Zone B)")
 
         # 2. اقتراح توزيع الأمتعة/الشحن
         cargo_suggestions = []
         if lmc_cargo > 0:
             if lmc_cargo <= 50:
-                cargo_suggestions.append(f"• ضع **{lmc_cargo} kg** بالكامل في **Hold 4 (AFT Bulk/Upper)** للتخزين السريع")
+                cargo_suggestions.append(f"• ضع {lmc_cargo}+ kg بالكامل في Hold 4 (AFT Bulk) للتداول السريع")
             else:
                 fwd_part = round(lmc_cargo * 0.4)
                 aft_part = lmc_cargo - fwd_part
-                cargo_suggestions.append(f"• ضع **{fwd_part} kg** في **Hold 2 (FWD)**")
-                cargo_suggestions.append(f"• ضع **{aft_part} kg** في **Hold 3 (AFT)** للحفاظ على مركز الثقل")
+                cargo_suggestions.append(f"• ضع {fwd_part}+ kg في Hold 2 (FWD)")
+                cargo_suggestions.append(f"• ضع {aft_part}+ kg في Hold 3 (AFT) للحفاظ على التوازن")
         elif lmc_cargo < 0:
-            cargo_suggestions.append(f"• إنقاص **{abs(lmc_cargo)} kg** من **Hold 3 أو Hold 2**")
+            cargo_suggestions.append(f"• إنقاص {abs(lmc_cargo)} kg من Hold 3 أو Hold 2")
 
-        # عرض التوصية في صندوق إرشادي
+        # عرض التوصية
         st.success("\n".join(pax_suggestions + cargo_suggestions))
-        st.info("👆 **الخطوة التالية:** يمكنك الآن الصعود إلى الأعلى لتحديث خانات المدخلات الرئيسية بهذه الأرقام لإعتماد الـ Loadsheet النهائي.")
+        st.info("يمكنك الآن الصعود إلى الأعلى لتحديث خانات المدخلات الرئيسية بهذه الأرقام لاعتماد الـ Loadsheet النهائي.")
