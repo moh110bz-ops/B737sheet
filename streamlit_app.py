@@ -129,6 +129,7 @@ if "selected_tail" not in st.session_state:
 if "current_page" not in st.session_state:
     st.session_state.current_page = "Home"
 
+# TOP NAVIGATION BAR
 nav_col1, nav_col2, nav_col3 = st.columns([2, 1, 1])
 
 with nav_col1:
@@ -155,10 +156,9 @@ MAC_LENGTH = 3.713
 
 
 # ==============================================================================
-# 1. HOME PAGE (WELCOME & SEARCH)
+# 1. HOME PAGE (WELCOME & SELECTION)
 # ==============================================================================
 if st.session_state.current_page == "Home":
-    
     st.markdown('<div class="hero-title">AirSheet Flight Dispatch & Load Control Engine</div>', unsafe_allow_html=True)
     st.markdown(
         '<div class="hero-subtitle">'
@@ -167,26 +167,19 @@ if st.session_state.current_page == "Home":
         '</div>', 
         unsafe_allow_html=True
     )
-    
     st.markdown("---")
     
     c_search_1, c_search_2, c_search_3 = st.columns([1, 2, 1])
-    
     with c_search_2:
         st.subheader("Select Aircraft from System Fleet:")
-        
         available_tails = list(st.session_state.fleet_db.keys())
-        
         if available_tails:
             selected_tail_choice = st.selectbox("Select Tail Registration:", available_tails, index=0)
-            
             if selected_tail_choice:
                 ac_info = st.session_state.fleet_db[selected_tail_choice]
                 st.info(f"**Operator:** {ac_info['airline']} | **Type:** {ac_info['type']} | **Base DOW:** {ac_info['dow']:,} kg")
-                
                 if ac_info["is_restricted"]:
                     st.warning(f"⚠️ **Operational Restriction Active:** {ac_info.get('restriction_reason', 'MEL Limits')}")
-                
                 if st.button("Launch Loadsheet & Calculations", use_container_width=True):
                     st.session_state.selected_tail = selected_tail_choice
                     st.session_state.current_page = "WNB_Engine"
@@ -312,7 +305,7 @@ elif st.session_state.current_page == "Edit_Aircraft":
 
 
 # ==============================================================================
-# 4. PAGE: AIRSHEET W&B ENGINE (SIGMA CORE DRIVEN)
+# 4. PAGE: AIRSHEET W&B ENGINE (FULL DISPATCH WORKFLOW)
 # ==============================================================================
 elif st.session_state.current_page == "WNB_Engine":
     active_tail = st.session_state.selected_tail
@@ -351,36 +344,43 @@ elif st.session_state.current_page == "WNB_Engine":
             num_infants = st.number_input("Infants (10 kg):", min_value=0, max_value=30, value=0, step=1)
             
         total_pax_seats = num_adults + num_children
-        
+
+        # Defaults for cabin zones based on capacities
+        cap_a = LIMITS["CAP_A"]
+        cap_b = LIMITS["CAP_B"]
+        cap_c = LIMITS["CAP_C"]
+        tot_cap = cap_a + cap_b + cap_c if (cap_a + cap_b + cap_c) > 0 else 189
+
+        default_a = min(cap_a, int(total_pax_seats * (cap_a / tot_cap)))
+        default_b = min(cap_b, int(total_pax_seats * (cap_b / tot_cap)))
+        default_c = max(0, total_pax_seats - (default_a + default_b))
+
         st.markdown("---")
-        st.write("**Total Cargo & Baggage Input (kg):**")
-        total_cargo_input = st.number_input("Total Cargo / Baggage Weight (kg):", min_value=0, max_value=15000, value=0, step=50)
+        st.write("**Cabin Zone Passenger Distribution (Editable):**")
+        zc1, zc2, zc3 = st.columns(3)
+        with zc1:
+            pax_a = st.number_input("Zone A Pax:", min_value=0, max_value=cap_a, value=default_a, step=1)
+        with zc2:
+            pax_b = st.number_input("Zone B Pax:", min_value=0, max_value=cap_b, value=default_b, step=1)
+        with zc3:
+            pax_c = st.number_input("Zone C Pax:", min_value=0, max_value=cap_c, value=default_c, step=1)
+
+        st.markdown("---")
+        st.write("**Cargo Holds Loading (kg) - Fully Editable:**")
+        hc1, hc2 = st.columns(2)
+        with hc1:
+            c1 = st.number_input("Hold 1 (FWD Upper):", min_value=0, max_value=int(LIMITS["HOLD1_MAX"]), value=0, step=50)
+            c2 = st.number_input("Hold 2 (FWD Lower):", min_value=0, max_value=int(LIMITS["HOLD2_MAX"]), value=0, step=50)
+        with hc2:
+            c3 = st.number_input("Hold 3 (AFT Lower):", min_value=0, max_value=int(LIMITS["HOLD3_MAX"]), value=0, step=50)
+            c4 = st.number_input("Hold 4 (AFT Upper):", min_value=0, max_value=int(LIMITS["HOLD4_MAX"]), value=0, step=50)
         
         st.markdown("---")
         st.write("**Fuel Management (kg):**")
         to_fuel = st.number_input("Takeoff Fuel (TBOF):", value=0.0, step=100.0)
         trip_fuel = st.number_input("Trip Fuel:", value=0.0, step=100.0)
 
-    # --- AUTOMATIC SMART LOAD ALLOCATION ENGINE ---
-    cap_a = LIMITS["CAP_A"]
-    cap_b = LIMITS["CAP_B"]
-    cap_c = LIMITS["CAP_C"]
-    total_cap = cap_a + cap_b + cap_c if (cap_a + cap_b + cap_c) > 0 else 189
-
-    pax_a = min(cap_a, int(total_pax_seats * (cap_a / total_cap)))
-    pax_b = min(cap_b, int(total_pax_seats * (cap_b / total_cap)))
-    pax_c = max(0, total_pax_seats - (pax_a + pax_b))
-
-    h1_max = LIMITS["HOLD1_MAX"]
-    h2_max = LIMITS["HOLD2_MAX"]
-    h3_max = LIMITS["HOLD3_MAX"]
-    h4_max = LIMITS["HOLD4_MAX"]
-    
-    c1 = min(h1_max, round(total_cargo_input * 0.20))
-    c2 = min(h2_max, round(total_cargo_input * 0.35))
-    c3 = min(h3_max, round(total_cargo_input * 0.35))
-    c4 = max(0, total_cargo_input - (c1 + c2 + c3))
-
+    # --- CALCULATIONS ENGINE ---
     total_pax_wt = (num_adults * PAX_WEIGHTS["ADULT"]) + (num_children * PAX_WEIGHTS["CHILD"]) + (num_infants * PAX_WEIGHTS["INFANT"])
     total_cargo_wt = c1 + c2 + c3 + c4
 
@@ -444,16 +444,17 @@ elif st.session_state.current_page == "WNB_Engine":
         
         with m1:
             st.caption(f"**ZFW (Max: {LIMITS['MZFW']:,} kg)**")
-            st.metric(label="Zero Fuel Wt", value=f"{zfw:,} kg", delta="SAFE" if is_zfw_safe else f"EXCEEDED (+{zfw - LIMITS['MZFW']} kg)", delta_color="normal" if is_zfw_safe else "inverse")
+            st.metric(label="Zero Fuel Wt", value=f"{zfw:,} kg", delta="SAFE" if is_zfw_safe else f"EXCEEDED", delta_color="normal" if is_zfw_safe else "inverse")
             
         with m2:
             st.caption(f"**TOW (Max: {LIMITS['MTOW']:,} kg)**")
-            st.metric(label="Takeoff Wt", value=f"{tow:,} kg", delta="SAFE" if is_tow_safe else f"EXCEEDED (+{tow - LIMITS['MTOW']} kg)", delta_color="normal" if is_tow_safe else "inverse")
+            st.metric(label="Takeoff Wt", value=f"{tow:,} kg", delta="SAFE" if is_tow_safe else f"EXCEEDED", delta_color="normal" if is_tow_safe else "inverse")
             
         with m3:
             st.caption(f"**LW (Max: {LIMITS['MLW']:,} kg)**")
-            st.metric(label="Landing Wt", value=f"{lw:,} kg", delta="SAFE" if is_lw_safe else f"EXCEEDED (+{lw - LIMITS['MLW']} kg)", delta_color="normal" if is_lw_safe else "inverse")
+            st.metric(label="Landing Wt", value=f"{lw:,} kg", delta="SAFE" if is_lw_safe else f"EXCEEDED", delta_color="normal" if is_lw_safe else "inverse")
         
+        # --- CENTER OF GRAVITY PLACED DIRECTLY BETWEEN WEIGHTS AND 3D/VISUALS ---
         st.markdown("---")
         st.write("**Takeoff Center of Gravity (%MAC):**")
         st.title(f"{mac_percent:.2f}%")
@@ -462,9 +463,9 @@ elif st.session_state.current_page == "WNB_Engine":
             st.markdown('<div class="badge-safe">SAFE (In Envelope)</div>', unsafe_allow_html=True)
         else:
             st.markdown('<div class="badge-danger">OUT OF ENVELOPE</div>', unsafe_allow_html=True)
+        st.markdown("---")
 
         if display_mode == "3D Hull View":
-            st.markdown("---")
             st.markdown(f"### 3D Aircraft Hull & Internal Compartments [{active_tail}]")
             
             u = np.linspace(0, 2 * np.pi, 24)
@@ -580,23 +581,20 @@ elif st.session_state.current_page == "WNB_Engine":
                 showlegend=False
             )
 
-            st.plotly_chart(fig_3d, use_container_width=True, key="sudan_fleet_3d_v1")
+            st.plotly_chart(fig_3d, use_container_width=True, key="sudan_fleet_3d_v_full")
 
         st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("### Automatic Cabin & Cargo Distribution:")
+        st.markdown("### Cabin Seating & Hold Status:")
         
-        st.progress(pax_a / LIMITS["CAP_A"] if LIMITS["CAP_A"] > 0 else 0, text=f"Zone A: {pax_a} Pax (Max {LIMITS['CAP_A']})")
+        st.progress(pax_a / LIMITS["CAP_A"] if LIMITS["CAP_A"] > 0 else 0, text=f"Zone A: {pax_a} Pax")
         st.markdown(f'<div class="pax-breakdown"><b>{a_adult} Adult / {a_child} Child / {a_infant} Infant</b></div>', unsafe_allow_html=True)
         
-        st.progress(pax_b / LIMITS["CAP_B"] if LIMITS["CAP_B"] > 0 else 0, text=f"Zone B: {pax_b} Pax (Max {LIMITS['CAP_B']})")
+        st.progress(pax_b / LIMITS["CAP_B"] if LIMITS["CAP_B"] > 0 else 0, text=f"Zone B: {pax_b} Pax")
         st.markdown(f'<div class="pax-breakdown"><b>{b_adult} Adult / {b_child} Child / {b_infant} Infant</b></div>', unsafe_allow_html=True)
         
-        st.progress(pax_c / LIMITS["CAP_C"] if LIMITS["CAP_C"] > 0 else 0, text=f"Zone C: {pax_c} Pax (Max {LIMITS['CAP_C']})")
+        st.progress(pax_c / LIMITS["CAP_C"] if LIMITS["CAP_C"] > 0 else 0, text=f"Zone C: {pax_c} Pax")
         st.markdown(f'<div class="pax-breakdown"><b>{c_adult} Adult / {c_child} Child / {c_infant} Infant</b></div>', unsafe_allow_html=True)
 
-        st.markdown("---")
-        st.write(f"**Automatically Distributed Holds:** Hold 1: {c1}kg | Hold 2: {c2}kg | Hold 3: {c3}kg | Hold 4: {c4}kg")
-        
         st.markdown("---")
         st.subheader("Last Minute Changes (LMC Engine)")
         
@@ -624,7 +622,7 @@ elif st.session_state.current_page == "WNB_Engine":
                         alloc_a += 1
                         cap_a_rem -= 1
                     elif cap_c_rem > cap_a_rem and cap_c_rem > 0:
-                        alloc_c_rem += 1
+                        alloc_c += 1
                         cap_c_rem -= 1
                     elif cap_b_rem > 0:
                         alloc_b += 1
@@ -636,17 +634,17 @@ elif st.session_state.current_page == "WNB_Engine":
                 if alloc_b > 0: pax_suggestions.append(f"• Add {alloc_b} Pax in Zone B")
                 if alloc_c > 0: pax_suggestions.append(f"• Add {alloc_c} Pax in Zone C")
             elif lmc_pax < 0:
-                pax_suggestions.append(f"• Offload {abs(lmc_pax)} Pax from congested area (Zone C / Zone B)")
+                pax_suggestions.append(f"• Offload {abs(lmc_pax)} Pax from congested area")
 
             cargo_suggestions = []
             if lmc_cargo > 0:
                 if lmc_cargo <= 50:
-                    cargo_suggestions.append(f"• Load {lmc_cargo} kg into Hold 4 (AFT Bulk) for quick dispatch")
+                    cargo_suggestions.append(f"• Load {lmc_cargo} kg into Hold 4 (AFT Bulk)")
                 else:
                     fwd_part = round(lmc_cargo * 0.4)
                     aft_part = lmc_cargo - fwd_part
                     cargo_suggestions.append(f"• Load {fwd_part} kg into Hold 2 (FWD)")
-                    cargo_suggestions.append(f"• Load {aft_part} kg into Hold 3 (AFT) for CG balance")
+                    cargo_suggestions.append(f"• Load {aft_part} kg into Hold 3 (AFT)")
             elif lmc_cargo < 0:
                 cargo_suggestions.append(f"• Offload {abs(lmc_cargo)} kg from Hold 3 or Hold 2")
 
