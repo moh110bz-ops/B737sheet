@@ -224,12 +224,11 @@ with col_visual:
         
     with m3:
         st.caption(f"**LW (Max: {LIMITS['MLW']:,} kg)**")
-        st.metric(label="Landing Wt", value=f"{lw:,} kg", delta="SAFE" if is_lw_safe else f"EXCEEDED (+{lw - LIMITS['MLW']} kg)", delta_color="normal" if is_lw_safe else "inverse")
-      # --- Interactive Trim Sheet Envelope Graph ---
+        st.metric(label="Landing Wt", value=f"{lw:,} kg", delta="SAFE" if is_lw_safe else f"EXCEEDED (+{lw - LIMITS['MLW']} kg)", delta_color="normal" if is_lw_safe else "    # --- Simplified Clean Trim Sheet Envelope Graph ---    # --- Simplified Clean Trim Sheet Envelope Graph ---
     st.markdown("---")
     st.markdown("### 📈 CG Trim Sheet Envelope")
 
-    # 1. Precise CG (%MAC) Calculations for ZFW & LW
+    # 1. Precise CG (%MAC) Calculations
     zfw_moment = dow_moment + pax_moment + cargo_moment
     zfw_cg_meters = zfw_moment / zfw if zfw > 0 else 0
     zfw_mac = ((zfw_cg_meters - LEMAC) / MAC_LENGTH) * 100.0
@@ -238,51 +237,51 @@ with col_visual:
     lw_cg_meters = lw_moment / lw if lw > 0 else 0
     lw_mac = ((lw_cg_meters - LEMAC) / MAC_LENGTH) * 100.0
 
-    # 2. B737-800 Envelope Structural Boundaries (%MAC vs Weight kg)
+    # 2. B737-800 Envelope Structural Boundaries
     envelope_mac = [8.0, 8.0, 15.0, 33.0, 33.0, 8.0]
     envelope_weight = [40000, 62731, 79015, 79015, 40000, 40000]
 
-    # 3. Create Graphical Figure & Add Safe Envelope Boundary Line
+    # 3. Create Simplified Plot
     fig = go.Figure()
 
+    # Green Safe Area
     fig.add_trace(go.Scatter(
         x=envelope_mac, 
         y=envelope_weight,
         fill="toself",
-        fillcolor="rgba(46, 125, 50, 0.2)",
+        fillcolor="rgba(46, 125, 50, 0.15)",
         line=dict(color="#2e7d32", width=2),
-        name="Safe Envelope Boundary"
+        name="Safe Boundary"
     ))
 
-    # 4. Add Current Flight CG Trajectory Points (ZFW -> TOW -> LW)
+    # Flight Vector Line (ZFW -> TOW -> LW)
     fig.add_trace(go.Scatter(
         x=[zfw_mac, mac_percent, lw_mac],
         y=[zfw, tow, lw],
         mode="lines+markers+text",
         text=["ZFW", "TOW", "LW"],
         textposition="top center",
-        marker=dict(size=10, color=["#ab47bc", "#66bb6a", "#29b6f6"]),
-        line=dict(color="#ffffff", width=2, dash="dash"),
-        name="Flight CG Vector"
+        marker=dict(size=9, color=["#ab47bc", "#00e676", "#29b6f6"]),
+        line=dict(color="#ffffff", width=2, dash="dot"),
+        name="Flight CG"
     ))
 
-    # 5. Customize Chart Layout & Display in Streamlit
+    # Clean Layout Setup
     fig.update_layout(
-        title="B737-800 Takeoff & Landing CG Limits",
-        xaxis_title="%MAC (Center of Gravity)",
+        xaxis_title="%MAC",
         yaxis_title="Weight (kg)",
-        xaxis=dict(range=[0, 40], gridcolor="#333"),
-        yaxis=dict(range=[35000, 82000], gridcolor="#333"),
+        xaxis=dict(range=[5, 36], gridcolor="#222222"),
+        yaxis=dict(range=[38000, 82000], gridcolor="#222222"),
         paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(15,23,42,0.6)",
+        plot_bgcolor="#111827",
         font=dict(color="#ffffff"),
-        height=380,
-        margin=dict(l=20, r=20, t=40, b=20)
+        height=320,
+        margin=dict(l=10, r=10, t=10, b=10),
+        showlegend=False
     )
 
-    st.plotly_chart(fig, use_container_width=True)
-      
-    st.plotly_chart(fig, use_container_width=True)
+    # Unique Key prevents DuplicateElementId error
+  st.plotly_chart(fig, use_container_width=True, key="cg_envelope_chart_unique")
 
     # B737-800 Envelope Structural Boundaries (%MAC vs Weight kg)
     envelope_mac = [8.0, 8.0, 15.0, 33.0, 33.0, 8.0]
