@@ -110,7 +110,34 @@ with col_input:
         
         pax_c = min(LIMITS["CAP_C"], rem_seats)
         
-        st.info(f"Auto Allocated: Zone A = {pax_a} | Zone B = {pax_b} | Zone C = {pax_c}")
+                # Calculate Category Breakdown per Zone
+        actual_seated_pax = pax_a + pax_b + pax_c
+        if actual_seated_pax > 0:
+            ratio_a = pax_a / actual_seated_pax
+            ratio_b = pax_b / actual_seated_pax
+            ratio_c = pax_c / actual_seated_pax
+        else:
+            ratio_a = ratio_b = ratio_c = 0.33
+
+        a_adult = round(num_adults * ratio_a)
+        b_adult = round(num_adults * ratio_b)
+        c_adult = num_adults - (a_adult + b_adult)
+
+        a_child = round(num_children * ratio_a)
+        b_child = round(num_children * ratio_b)
+        c_child = num_children - (a_child + b_child)
+
+        a_infant = round(num_infants * ratio_a)
+        b_infant = round(num_infants * ratio_b)
+        c_infant = num_infants - (a_infant + b_infant)
+
+        st.info(
+            f"**Auto Allocated:**\n\n"
+            f"• **Zone A ({pax_a}):** {a_adult} Adult / {a_child} Child / {a_infant} Infant\n\n"
+            f"• **Zone B ({pax_b}):** {b_adult} Adult / {b_child} Child / {b_infant} Infant\n\n"
+            f"• **Zone C ({pax_c}):** {c_adult} Adult / {c_child} Child / {c_infant} Infant"
+        )
+
     else:
         st.write("**Manual Cabin Seating:**")
         pax_a = st.number_input("Zone A (Rows 1-10):", min_value=0, max_value=LIMITS["CAP_A"], value=38, step=1)
