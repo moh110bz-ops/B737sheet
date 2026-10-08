@@ -1,6 +1,6 @@
 import streamlit as st
 
-# --- 1. الثوابت والحدود الهيكلية لطائرة B737-800 ---
+# --- 1. الثوابت والأذرع الهندسية الرسمية لطائرة B737-800 (Datum = Nose) ---
 LIMITS = {
     "MTOW": 79015,  # Max Takeoff Weight (kg)
     "MZFW": 62731,  # Max Zero Fuel Weight (kg)
@@ -13,11 +13,22 @@ LIMITS = {
     "MAC_MAX": 33.0,  # %MAC Safe Limit High
 }
 
+# الأذرع الهندسية بالمتر من مقدمة الطائرة (Arms in meters)
 ARMS = {
-    "Zone_A": -12.5, "Zone_B": 0.0, "Zone_C": 14.2,
-    "Hold_1": -14.8, "Hold_2": -8.5, "Hold_3": 9.2, "Hold_4": 15.6,
-    "Fuel": 1.2
+    "DOW_ARM": 16.30,  # الذراع الافتراضي للوزن التشغيلي الفارغ
+    "Zone_A": 9.50,    # الصفوف 1-10
+    "Zone_B": 15.80,   # الصفوف 11-20
+    "Zone_C": 22.10,   # الصفوف 21-33
+    "Hold_1": 8.80,    # FWD Upper
+    "Hold_2": 11.40,   # FWD Lower
+    "Hold_3": 20.20,   # AFT Lower
+    "Hold_4": 22.80,   # AFT Upper
+    "Fuel": 16.20      # Main & Center Tanks Mean Arm
 }
+
+# ثوابت الوتر الوسطي للجناح (Mean Aerodynamic Chord)
+LEMAC = 15.56  # Leading Edge of MAC in meters
+MAC_LENGTH = 3.713  # Length of MAC in meters
 
 st.set_page_config(page_title="AirSheet - B737-800", layout="wide")
 
@@ -29,44 +40,51 @@ col_input, col_visual = st.columns([1, 1])
 with col_input:
     st.subheader("1. مدخلات الرحلة (Flight Inputs)")
     
-    dow = st.number_input("الوزن الفارغ العملياتي (DOW kg):", value=43000)
-    doi = st.number_input("مؤشر الوزن الفارغ (DOI Index):", value=45.0)
+    dow = st.number_input("الوزن الفارغ العملياتي (DOW kg):", value=43550)
+    doi = st.number_input("مؤشر الوزن الفارغ (DOI Index):", value=48.2)
     
     st.markdown("---")
     st.write("**توزيع الركاب (Passenger Distribution):**")
-    pax_a = st.slider("Zone A (الصف 1-10):", 0, 60, 45)
-    pax_b = st.slider("Zone B (الصف 11-20):", 0, 60, 50)
-    pax_c = st.slider("Zone C (الصف 21-33):", 0, 69, 55)
+    pax_a = st.slider("Zone A (الصف 1-10):", 0, 60, 38)
+    pax_b = st.slider("Zone B (الصف 11-20):", 0, 60, 52)
+    pax_c = st.slider("Zone C (الصف 21-33):", 0, 69, 58)
     
     st.markdown("---")
     st.write("**توزيع العنابر الشحن (Cargo Holds kg):**")
-    c1 = st.number_input("Hold 1 (FWD Upper):", 0, LIMITS["HOLD1_MAX"], 1200)
-    c2 = st.number_input("Hold 2 (FWD Lower):", 0, LIMITS["HOLD2_MAX"], 1500)
-    c3 = st.number_input("Hold 3 (AFT Lower):", 0, LIMITS["HOLD3_MAX"], 2000)
-    c4 = st.number_input("Hold 4 (AFT Upper):", 0, LIMITS["HOLD4_MAX"], 800)
+    c1 = st.number_input("Hold 1 (FWD Upper):", 0, LIMITS["HOLD1_MAX"], 850)
+    c2 = st.number_input("Hold 2 (FWD Lower):", 0, LIMITS["HOLD2_MAX"], 1450)
+    c3 = st.number_input("Hold 3 (AFT Lower):", 0, LIMITS["HOLD3_MAX"], 1800)
+    c4 = st.number_input("Hold 4 (AFT Upper):", 0, LIMITS["HOLD4_MAX"], 450)
     
     st.markdown("---")
     st.write("**بيانات الوقود (Fuel Data kg):**")
-    to_fuel = st.number_input("وقود الإقلاع (Takeoff Fuel):", value=11000)
-    trip_fuel = st.number_input("وقود الرحلة (Trip Fuel):", value=8500)
+    to_fuel = st.number_input("وقود الإقلاع (Takeoff Fuel):", value=10800)
+    trip_fuel = st.number_input("وقود الرحلة (Trip Fuel):", value=7200)
 
-# الحسابات
+# 2. أوزان الأحمال
+pax_a_wt = pax_a * 84
+pax_b_wt = pax_b * 84
+pax_c_wt = pax_c * 84
+
 total_pax = pax_a + pax_b + pax_c
-total_pax_wt = total_pax * 84
+total_pax_wt = pax_a_wt + pax_b_wt + pax_c_wt
 total_cargo_wt = c1 + c2 + c3 + c4
 
 zfw = dow + total_pax_wt + total_cargo_wt
 tow = zfw + to_fuel
 lw = tow - trip_fuel
 
-delta_index = (
-    (pax_a * 84 * ARMS["Zone_A"] + pax_b * 84 * ARMS["Zone_B"] + pax_c * 84 * ARMS["Zone_C"]) +
-    (c1 * ARMS["Hold_1"] + c2 * ARMS["Hold_2"] + c3 * ARMS["Hold_3"] + c4 * ARMS["Hold_4"]) +
-    (to_fuel * ARMS["Fuel"])
-) / 1000.0
+# 3. حساب العزوم الكلية (Moments Calculation)
+dow_moment = dow * ARMS["DOW_ARM"]
+pax_moment = (pax_a_wt * ARMS["Zone_A"]) + (pax_b_wt * ARMS["Zone_B"]) + (pax_c_wt * ARMS["Zone_C"])
+cargo_moment = (c1 * ARMS["Hold_1"]) + (c2 * ARMS["Hold_2"]) + (c3 * ARMS["Hold_3"]) + (c4 * ARMS["Hold_4"])
+fuel_moment = to_fuel * ARMS["Fuel"]
 
-final_index = doi + delta_index
-mac_percent = 18.5 + (delta_index * 100.0 / (tow / 1000.0))
+total_takeoff_moment = dow_moment + pax_moment + cargo_moment + fuel_moment
+
+# 4. حساب موقع مركز الثقل (CG Position & %MAC)
+cg_meters = total_takeoff_moment / tow
+mac_percent = ((cg_meters - LEMAC) / MAC_LENGTH) * 100.0
 
 with col_visual:
     st.subheader("2. الشاشة البصرية لتوزيع الأحمال")
