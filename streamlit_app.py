@@ -1,6 +1,6 @@
 import streamlit as st
 
-# --- 1. الثوابت والأذرع الهندسية الرسمية لطائرة B737-800 (Datum = Nose) ---
+# --- 1. الثوابت والأذرع الهندسية الرسمية لطائرة B737-800 ---
 LIMITS = {
     "MTOW": 79015,  # Max Takeoff Weight (kg)
     "MZFW": 62731,  # Max Zero Fuel Weight (kg)
@@ -13,22 +13,20 @@ LIMITS = {
     "MAC_MAX": 33.0,  # %MAC Safe Limit High
 }
 
-# الأذرع الهندسية بالمتر من مقدمة الطائرة (Arms in meters)
 ARMS = {
-    "DOW_ARM": 16.30,  # الذراع الافتراضي للوزن التشغيلي الفارغ
-    "Zone_A": 9.50,    # الصفوف 1-10
-    "Zone_B": 15.80,   # الصفوف 11-20
-    "Zone_C": 22.10,   # الصفوف 21-33
-    "Hold_1": 8.80,    # FWD Upper
-    "Hold_2": 11.40,   # FWD Lower
-    "Hold_3": 20.20,   # AFT Lower
-    "Hold_4": 22.80,   # AFT Upper
-    "Fuel": 16.20      # Main & Center Tanks Mean Arm
+    "DOW_ARM": 16.30,
+    "Zone_A": 9.50,
+    "Zone_B": 15.80,
+    "Zone_C": 22.10,
+    "Hold_1": 8.80,
+    "Hold_2": 11.40,
+    "Hold_3": 20.20,
+    "Hold_4": 22.80,
+    "Fuel": 16.20
 }
 
-# ثوابت الوتر الوسطي للجناح (Mean Aerodynamic Chord)
-LEMAC = 15.56  # Leading Edge of MAC in meters
-MAC_LENGTH = 3.713  # Length of MAC in meters
+LEMAC = 15.56
+MAC_LENGTH = 3.713
 
 st.set_page_config(page_title="AirSheet - B737-800", layout="wide")
 
@@ -61,7 +59,7 @@ with col_input:
     to_fuel = st.number_input("وقود الإقلاع (Takeoff Fuel):", value=10800)
     trip_fuel = st.number_input("وقود الرحلة (Trip Fuel):", value=7200)
 
-# 2. أوزان الأحمال
+# الحسابات الأساسية
 pax_a_wt = pax_a * 84
 pax_b_wt = pax_b * 84
 pax_c_wt = pax_c * 84
@@ -74,7 +72,6 @@ zfw = dow + total_pax_wt + total_cargo_wt
 tow = zfw + to_fuel
 lw = tow - trip_fuel
 
-# 3. حساب العزوم الكلية (Moments Calculation)
 dow_moment = dow * ARMS["DOW_ARM"]
 pax_moment = (pax_a_wt * ARMS["Zone_A"]) + (pax_b_wt * ARMS["Zone_B"]) + (pax_c_wt * ARMS["Zone_C"])
 cargo_moment = (c1 * ARMS["Hold_1"]) + (c2 * ARMS["Hold_2"]) + (c3 * ARMS["Hold_3"]) + (c4 * ARMS["Hold_4"])
@@ -82,7 +79,6 @@ fuel_moment = to_fuel * ARMS["Fuel"]
 
 total_takeoff_moment = dow_moment + pax_moment + cargo_moment + fuel_moment
 
-# 4. حساب موقع مركز الثقل (CG Position & %MAC)
 cg_meters = total_takeoff_moment / tow
 mac_percent = ((cg_meters - LEMAC) / MAC_LENGTH) * 100.0
 
@@ -109,10 +105,63 @@ with col_visual:
     st.progress(pax_c / 69, text=f"Zone C: {pax_c} Pax")
     
     st.markdown("---")
-    st.subheader("⚡ محرك التغيرات اللحظية (LMC Engine)")
+    st.subheader("⚡ محرك التغيرات اللحظية واقتراح التوزيع (LMC Engine)")
+    
     lmc_pax = st.number_input("تعديل ركاب لحظي (+/- Pax):", value=0)
-    lmc_cargo = st.number_input("تعديل شحن لحظي (+/- Cargo kg):", value=0)
+    lmc_cargo = st.number_input("تعديل أمتعة/شحن لحظي (+/- Cargo kg):", value=0)
     
     if lmc_pax != 0 or lmc_cargo != 0:
-        new_tow = tow + (lmc_pax * 84) + lmc_cargo
-        st.warning(f"وزن الإقلاع الجديد بعد الـ LMC: **{new_tow:,} kg**")
+        added_pax_wt = lmc_pax * 84
+        new_tow = tow + added_pax_wt + lmc_cargo
+        st.warning(f"⚖️ **وزن الإقلاع الجديد بعد الـ LMC:** `{new_tow:,} kg` (التعديل: `{added_pax_wt + lmc_cargo:+} kg`)")
+        
+        st.markdown("#### 💡 **مقترح التوزيع الذكي للـ LMC:**")
+        
+        # 1. اقتراح توزيع الركاب
+        pax_suggestions = []
+        if lmc_pax > 0:
+            rem_pax = lmc_pax
+            # فحص السعة المتاحة في الزونات
+            cap_a = 60 - pax_a
+            cap_b = 60 - pax_b
+            cap_c = 69 - pax_c
+            
+            # الاقتراح الأول: توزيع على B أولاً للحياد ثم A و C
+            alloc_a, alloc_b, alloc_c = 0, 0, 0
+            
+            # توزيع التوازن
+            for _ in range(rem_pax):
+                if cap_a >= cap_c and cap_a > 0:
+                    alloc_a += 1
+                    cap_a -= 1
+                elif cap_c > cap_a and cap_c > 0:
+                    alloc_c += 1
+                    cap_c -= 1
+                elif cap_b > 0:
+                    alloc_b += 1
+                    cap_b -= 1
+                else:
+                    alloc_a += 1
+                    
+            if alloc_a > 0: pax_suggestions.append(f"• ضع **{alloc_a} راكب** في **Zone A**")
+            if alloc_b > 0: pax_suggestions.append(f"• ضع **{alloc_b} راكب** في **Zone B**")
+            if alloc_c > 0: pax_suggestions.append(f"• ضع **{alloc_c} راكب** في **Zone C**")
+        elif lmc_pax < 0:
+            pax_suggestions.append(f"• قم بإلغاء **{abs(lmc_pax)} راكب** من المنطقة الأكثر ازدحاماً (Zone C أو Zone B)")
+
+        # 2. اقتراح توزيع الأمتعة/الشحن
+        cargo_suggestions = []
+        if lmc_cargo > 0:
+            if lmc_cargo <= 50:
+                cargo_suggestions.append(f"• ضع **{lmc_cargo} kg** بالكامل في **Hold 4 (AFT Bulk/Upper)** للتخزين السريع")
+            else:
+                fwd_part = round(lmc_cargo * 0.4)
+                aft_part = lmc_cargo - fwd_part
+                cargo_suggestions.append(f"• ضع **{fwd_part} kg** في **Hold 2 (FWD)**")
+                cargo_suggestions.append(f"• ضع **{aft_part} kg** في **Hold 3 (AFT)** للحفاظ على مركز الثقل")
+        elif lmc_cargo < 0:
+            cargo_suggestions.append(f"• إنقاص **{abs(lmc_cargo)} kg** من **Hold 3 أو Hold 2**")
+
+        # عرض التوصية في صندوق إرشادي
+        st.success("\n".join(pax_suggestions + cargo_suggestions))
+        st.info("👆 **الخطوة التالية:** يمكنك الآن الصعود إلى الأعلى لتحديث خانات المدخلات الرئيسية بهذه الأرقام لإعتماد الـ Loadsheet النهائي.")
