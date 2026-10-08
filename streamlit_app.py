@@ -1,4 +1,6 @@
 import streamlit as st
+import plotly.graph_objects as go
+import numpy as np
 
 # --- 1. Boeing 737-800 Structural Limits & Constants ---
 LIMITS = {
@@ -197,10 +199,17 @@ fuel_moment = to_fuel * ARMS["Fuel"]
 
 total_takeoff_moment = dow_moment + pax_moment + cargo_moment + fuel_moment
 
-cg_meters = total_takeoff_moment / tow
+cg_meters = total_takeoff_moment / tow if tow > 0 else 0
 mac_percent = ((cg_meters - LEMAC) / MAC_LENGTH) * 100.0
 
 with col_visual:
+    # --- View Mode Selector ---
+    display_mode = st.radio(
+        "Display Mode:",
+        ["Standard Dashboard", "3D Hull View"],
+        horizontal=True
+    )
+    
     st.subheader("2. Graphical Load Distribution")
     
     is_zfw_safe = zfw <= LIMITS["MZFW"]
@@ -233,18 +242,91 @@ with col_visual:
     else:
         st.markdown('<div class="badge-danger">OUT OF ENVELOPE</div>', unsafe_allow_html=True)
 
+    # --- CONDITIONAL DISPLAY BASED ON USER SELECTOR ---
+    if display_mode == "3D Hull View":
+        st.markdown("---")
+        st.markdown("### 3D Aircraft Balance Visualizer (X, Y, Z)")
+        
+        fuselage_length = 39.5
+        radius = 1.88
+        z_mesh = np.linspace(0, fuselage_length, 30)
+        theta = np.linspace(0, 2 * np.pi, 15)
+        theta_grid, z_grid = np.meshgrid(theta, z_mesh)
+        
+        x_grid = radius * np.cos(theta_grid)
+        y_grid = radius * np.sin(theta_grid)
+        
+        fig_3d = go.Figure()
+        
+        # Translucent Fuselage
+        fig_3d.add_trace(go.Surface(
+            x=x_grid, y=z_grid, z=y_grid,
+            opacity=0.15,
+            showscale=False,
+            colorscale="Blues",
+            name="Fuselage Hull"
+        ))
+        
+        # Wings Geometry
+        fig_3d.add_trace(go.Scatter3d(
+            x=[0, -17, 0, 17, 0],
+            y=[16.0, 21.0, 20.0, 21.0, 16.0],
+            z=[0, 0, 0, 0, 0],
+            mode="lines",
+            line=dict(color="#4fc3f7", width=4),
+            name="Wings & Fuel Tanks"
+        ))
+        
+        # Active CG Point
+        cg_color = "#00e676" if is_mac_safe else "#ff1744"
+        fig_3d.add_trace(go.Scatter3d(
+            x=[0.0],
+            y=[cg_meters],
+            z=[0.0],
+            mode="markers+text",
+            marker=dict(size=10, color=cg_color, symbol="diamond"),
+            text=[f"CG: {mac_percent:.2f}% MAC"],
+            textposition="top center",
+            name="Flight CG"
+        ))
+        
+        # Reference Axes
+        fig_3d.add_trace(go.Scatter3d(
+            x=[-3, 3, 0, 0, 0, 0],
+            y=[cg_meters, cg_meters, 0, fuselage_length, cg_meters, cg_meters],
+            z=[0, 0, 0, 0, -3, 3],
+            mode="lines",
+            line=dict(color="#ffffff", width=1, dash="dash"),
+            name="Axes"
+        ))
+
+        fig_3d.update_layout(
+            scene=dict(
+                xaxis=dict(range=[-18, 18], visible=False),
+                yaxis=dict(title="Longitudinal Arm (m)", range=[0, 40], backgroundcolor="#0f172a"),
+                zaxis=dict(range=[-5, 5], visible=False),
+                aspectmode="manual",
+                aspectratio=dict(x=0.8, y=2.0, z=0.5),
+                camera=dict(eye=dict(x=1.5, y=1.2, z=0.8))
+            ),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            height=360,
+            margin=dict(l=0, r=0, t=10, b=0),
+            showlegend=False
+        )
+
+        st.plotly_chart(fig_3d, use_container_width=True, key="b737_3d_hull_toggle")
+
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("### Cabin Seating Visualizer:")
     
-    # Zone A
     st.progress(pax_a / LIMITS["CAP_A"], text=f"Zone A: {pax_a} Pax")
     st.markdown(f'<div class="pax-breakdown"><b>{a_adult} Adult / {a_child} Child / {a_infant} Infant</b></div>', unsafe_allow_html=True)
     
-    # Zone B
     st.progress(pax_b / LIMITS["CAP_B"], text=f"Zone B: {pax_b} Pax")
     st.markdown(f'<div class="pax-breakdown"><b>{b_adult} Adult / {b_child} Child / {b_infant} Infant</b></div>', unsafe_allow_html=True)
     
-    # Zone C
     st.progress(pax_c / LIMITS["CAP_C"], text=f"Zone C: {pax_c} Pax")
     st.markdown(f'<div class="pax-breakdown"><b>{c_adult} Adult / {c_child} Child / {c_infant} Infant</b></div>', unsafe_allow_html=True)
     
