@@ -18,14 +18,12 @@ LIMITS = {
     "CAP_C": 69
 }
 
-# Standard ICAO Passenger Weights
 PAX_WEIGHTS = {
-    "ADULT": 84,   # Adult standard weight (kg)
-    "CHILD": 35,   # Child standard weight (kg)
-    "INFANT": 10   # Infant standard weight (kg)
+    "ADULT": 84,
+    "CHILD": 35,
+    "INFANT": 10
 }
 
-# Arms in meters from Datum (Nose)
 ARMS = {
     "DOW_ARM": 16.30,
     "Zone_A": 9.50,
@@ -43,7 +41,6 @@ MAC_LENGTH = 3.713
 
 st.set_page_config(page_title="AirSheet - B737-800", layout="wide")
 
-# Custom Status Badges & Layout CSS
 st.markdown("""
 <style>
     .badge-safe {
@@ -112,7 +109,6 @@ with col_input:
         
         pax_c = min(LIMITS["CAP_C"], rem_seats)
         
-        # Calculate Category Breakdown per Zone
         actual_seated_pax = pax_a + pax_b + pax_c
         if actual_seated_pax > 0:
             ratio_a = pax_a / actual_seated_pax
@@ -203,7 +199,6 @@ cg_meters = total_takeoff_moment / tow if tow > 0 else 0
 mac_percent = ((cg_meters - LEMAC) / MAC_LENGTH) * 100.0
 
 with col_visual:
-    # --- View Mode Selector ---
     display_mode = st.radio(
         "Display Mode:",
         ["Standard Dashboard", "3D Hull View"],
@@ -242,81 +237,93 @@ with col_visual:
     else:
         st.markdown('<div class="badge-danger">OUT OF ENVELOPE</div>', unsafe_allow_html=True)
 
-    # --- CONDITIONAL DISPLAY BASED ON USER SELECTOR ---
     if display_mode == "3D Hull View":
         st.markdown("---")
-        st.markdown("### 3D Aircraft Balance Visualizer (X, Y, Z)")
+        st.markdown("### 3D Aircraft Hull & CG Location")
         
-        fuselage_length = 39.5
-        radius = 1.88
-        z_mesh = np.linspace(0, fuselage_length, 30)
-        theta = np.linspace(0, 2 * np.pi, 15)
-        theta_grid, z_grid = np.meshgrid(theta, z_mesh)
+        # Build 3D B737-800 Mesh Geometry
+        u = np.linspace(0, 2 * np.pi, 20)
+        v = np.linspace(0, np.pi, 20)
         
-        x_grid = radius * np.cos(theta_grid)
-        y_grid = radius * np.sin(theta_grid)
+        # Fuselage Cylinder + Nose + Tail Cone
+        y_fuselage = np.linspace(0, 39.5, 30)
+        u_grid, y_grid = np.meshgrid(u, y_fuselage)
+        
+        # Radius profile along length (Nose taper, Cylinder body, Tail taper)
+        r_profile = np.piecewise(y_fuselage, 
+            [y_fuselage < 5, (y_fuselage >= 5) & (y_fuselage <= 32), y_fuselage > 32],
+            [lambda y: 1.88 * np.sin((y / 5) * (np.pi / 2)),
+             1.88,
+             lambda y: 1.88 * np.cos(((y - 32) / 7.5) * (np.pi / 2))]
+        )
+        
+        r_grid, _ = np.meshgrid(r_profile, u)
+        r_grid = r_grid.T
+        
+        x_hull = r_grid * np.cos(u_grid)
+        z_hull = r_grid * np.sin(u_grid)
         
         fig_3d = go.Figure()
         
-        # Translucent Fuselage
+        # 1. Translucent Fuselage Body
         fig_3d.add_trace(go.Surface(
-            x=x_grid, y=z_grid, z=y_grid,
-            opacity=0.15,
+            x=x_hull, y=y_grid, z=z_hull,
+            opacity=0.25,
+            colorscale=[[0, "#29b6f6"], [1, "#0288d1"]],
             showscale=False,
-            colorscale="Blues",
-            name="Fuselage Hull"
+            name="B737 Hull"
         ))
         
-        # Wings Geometry
-        fig_3d.add_trace(go.Scatter3d(
-            x=[0, -17, 0, 17, 0],
-            y=[16.0, 21.0, 20.0, 21.0, 16.0],
-            z=[0, 0, 0, 0, 0],
-            mode="lines",
-            line=dict(color="#4fc3f7", width=4),
-            name="Wings & Fuel Tanks"
+        # 2. Main Wings Outer Polygon
+        fig_3d.add_trace(go.Mesh3d(
+            x=[0, -17.0, -17.0, 0, 17.0, 17.0],
+            y=[15.0, 21.0, 23.5, 21.0, 23.5, 21.0],
+            z=[-0.3, -0.3, -0.3, -0.3, -0.3, -0.3],
+            color="#4fc3f7",
+            opacity=0.4,
+            name="Wings"
         ))
         
-        # Active CG Point
+        # 3. Horizontal Stabilizers (Tail)
+        fig_3d.add_trace(go.Mesh3d(
+            x=[0, -6.0, -6.0, 0, 6.0, 6.0],
+            y=[35.0, 38.0, 39.0, 37.5, 39.0, 38.0],
+            z=[0.2, 0.2, 0.2, 0.2, 0.2, 0.2],
+            color="#0288d1",
+            opacity=0.5,
+            name="Tail Fin"
+        ))
+        
+        # 4. Actual CG Diamond Point
         cg_color = "#00e676" if is_mac_safe else "#ff1744"
         fig_3d.add_trace(go.Scatter3d(
             x=[0.0],
             y=[cg_meters],
             z=[0.0],
             mode="markers+text",
-            marker=dict(size=10, color=cg_color, symbol="diamond"),
+            marker=dict(size=12, color=cg_color, symbol="diamond"),
             text=[f"CG: {mac_percent:.2f}% MAC"],
             textposition="top center",
-            name="Flight CG"
-        ))
-        
-        # Reference Axes
-        fig_3d.add_trace(go.Scatter3d(
-            x=[-3, 3, 0, 0, 0, 0],
-            y=[cg_meters, cg_meters, 0, fuselage_length, cg_meters, cg_meters],
-            z=[0, 0, 0, 0, -3, 3],
-            mode="lines",
-            line=dict(color="#ffffff", width=1, dash="dash"),
-            name="Axes"
+            name="Center of Gravity"
         ))
 
         fig_3d.update_layout(
             scene=dict(
-                xaxis=dict(range=[-18, 18], visible=False),
-                yaxis=dict(title="Longitudinal Arm (m)", range=[0, 40], backgroundcolor="#0f172a"),
-                zaxis=dict(range=[-5, 5], visible=False),
+                xaxis=dict(range=[-20, 20], visible=False, showgrid=False),
+                yaxis=dict(title="Longitudinal Distance (m)", range=[0, 42], backgroundcolor="#0f172a", showgrid=False),
+                zaxis=dict(range=[-10, 10], visible=False, showgrid=False),
                 aspectmode="manual",
-                aspectratio=dict(x=0.8, y=2.0, z=0.5),
-                camera=dict(eye=dict(x=1.5, y=1.2, z=0.8))
+                aspectratio=dict(x=1.0, y=2.2, z=0.6),
+                camera=dict(eye=dict(x=1.6, y=1.3, z=0.9))
             ),
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
-            height=360,
+            height=380,
             margin=dict(l=0, r=0, t=10, b=0),
             showlegend=False
         )
 
-        st.plotly_chart(fig_3d, use_container_width=True, key="b737_3d_hull_toggle")
+        st.plotly_chart(fig_3d, use_container_width=True, key="b737_3d_hull_v2")
 
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("### Cabin Seating Visualizer:")
