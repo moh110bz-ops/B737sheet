@@ -153,7 +153,7 @@ with col_input:
     to_fuel = st.number_input("Takeoff Fuel (TBOF):", value=10800, step=100)
     trip_fuel = st.number_input("Trip Fuel:", value=7200, step=100)
 
-# 1. Structural Mass Calculations
+# Calculations
 total_pax_wt = (num_adults * PAX_WEIGHTS["ADULT"]) + (num_children * PAX_WEIGHTS["CHILD"]) + (num_infants * PAX_WEIGHTS["INFANT"])
 total_cargo_wt = c1 + c2 + c3 + c4
 
@@ -161,7 +161,6 @@ zfw = dow + total_pax_wt + total_cargo_wt
 tow = zfw + to_fuel
 lw = tow - trip_fuel
 
-# 2. Zone Breakdown Calculation
 actual_seated_pax = pax_a + pax_b + pax_c
 if actual_seated_pax > 0:
     ratio_a = pax_a / actual_seated_pax
@@ -239,17 +238,15 @@ with col_visual:
 
     if display_mode == "3D Hull View":
         st.markdown("---")
-        st.markdown("### 3D Aircraft Hull & CG Location")
+        st.markdown("### 3D Aircraft Hull & Internal Compartments")
         
-        # Build 3D B737-800 Mesh Geometry
+        # Build 3D Fuselage Shell
         u = np.linspace(0, 2 * np.pi, 20)
         v = np.linspace(0, np.pi, 20)
         
-        # Fuselage Cylinder + Nose + Tail Cone
         y_fuselage = np.linspace(0, 39.5, 30)
         u_grid, y_grid = np.meshgrid(u, y_fuselage)
         
-        # Radius profile along length (Nose taper, Cylinder body, Tail taper)
         r_profile = np.piecewise(y_fuselage, 
             [y_fuselage < 5, (y_fuselage >= 5) & (y_fuselage <= 32), y_fuselage > 32],
             [lambda y: 1.88 * np.sin((y / 5) * (np.pi / 2)),
@@ -268,40 +265,67 @@ with col_visual:
         # 1. Translucent Fuselage Body
         fig_3d.add_trace(go.Surface(
             x=x_hull, y=y_grid, z=z_hull,
-            opacity=0.25,
+            opacity=0.15,
             colorscale=[[0, "#29b6f6"], [1, "#0288d1"]],
             showscale=False,
-            name="B737 Hull"
+            name="Outer Hull"
         ))
         
-        # 2. Main Wings Outer Polygon
+        # --- Internal Compartment Colors & Safety Logic ---
+        fuel_color = "#00e676" if (to_fuel <= 20800 and is_tow_safe) else "#ff1744"
+        h1_color = "#00e676" if c1 <= LIMITS["HOLD1_MAX"] else "#ff1744"
+        h2_color = "#00e676" if c2 <= LIMITS["HOLD2_MAX"] else "#ff1744"
+        h3_color = "#00e676" if c3 <= LIMITS["HOLD3_MAX"] else "#ff1744"
+        h4_color = "#00e676" if c4 <= LIMITS["HOLD4_MAX"] else "#ff1744"
+
+        # 2. Internal Fuel Tanks (Wings & Center Tank)
         fig_3d.add_trace(go.Mesh3d(
-            x=[0, -17.0, -17.0, 0, 17.0, 17.0],
-            y=[15.0, 21.0, 23.5, 21.0, 23.5, 21.0],
-            z=[-0.3, -0.3, -0.3, -0.3, -0.3, -0.3],
-            color="#4fc3f7",
-            opacity=0.4,
-            name="Wings"
+            x=[0, -15.0, -15.0, 0, 15.0, 15.0],
+            y=[15.5, 19.5, 21.5, 19.5, 21.5, 19.5],
+            z=[-0.2, -0.2, -0.2, -0.2, -0.2, -0.2],
+            color=fuel_color,
+            opacity=0.8,
+            name=f"Fuel Tanks ({to_fuel:,} kg)"
         ))
         
-        # 3. Horizontal Stabilizers (Tail)
+        # 3. Internal Cargo Holds (Lower Deck)
+        # Hold 1
         fig_3d.add_trace(go.Mesh3d(
-            x=[0, -6.0, -6.0, 0, 6.0, 6.0],
-            y=[35.0, 38.0, 39.0, 37.5, 39.0, 38.0],
-            z=[0.2, 0.2, 0.2, 0.2, 0.2, 0.2],
-            color="#0288d1",
-            opacity=0.5,
-            name="Tail Fin"
+            x=[-1, -1, 1, 1, -1, -1, 1, 1],
+            y=[7.5, 10.0, 10.0, 7.5, 7.5, 10.0, 10.0, 7.5],
+            z=[-1.4, -1.4, -1.4, -1.4, -0.4, -0.4, -0.4, -0.4],
+            color=h1_color, opacity=0.7, name=f"Hold 1: {c1}kg"
         ))
-        
-        # 4. Actual CG Diamond Point
+        # Hold 2
+        fig_3d.add_trace(go.Mesh3d(
+            x=[-1, -1, 1, 1, -1, -1, 1, 1],
+            y=[10.2, 12.8, 12.8, 10.2, 10.2, 12.8, 12.8, 10.2],
+            z=[-1.4, -1.4, -1.4, -1.4, -0.4, -0.4, -0.4, -0.4],
+            color=h2_color, opacity=0.7, name=f"Hold 2: {c2}kg"
+        ))
+        # Hold 3
+        fig_3d.add_trace(go.Mesh3d(
+            x=[-1, -1, 1, 1, -1, -1, 1, 1],
+            y=[18.5, 21.8, 21.8, 18.5, 18.5, 21.8, 21.8, 18.5],
+            z=[-1.4, -1.4, -1.4, -1.4, -0.4, -0.4, -0.4, -0.4],
+            color=h3_color, opacity=0.7, name=f"Hold 3: {c3}kg"
+        ))
+        # Hold 4
+        fig_3d.add_trace(go.Mesh3d(
+            x=[-1, -1, 1, 1, -1, -1, 1, 1],
+            y=[22.0, 24.5, 24.5, 22.0, 22.0, 24.5, 24.5, 22.0],
+            z=[-1.4, -1.4, -1.4, -1.4, -0.4, -0.4, -0.4, -0.4],
+            color=h4_color, opacity=0.7, name=f"Hold 4: {c4}kg"
+        ))
+
+        # 4. Actual Flight CG Point
         cg_color = "#00e676" if is_mac_safe else "#ff1744"
         fig_3d.add_trace(go.Scatter3d(
             x=[0.0],
             y=[cg_meters],
             z=[0.0],
             mode="markers+text",
-            marker=dict(size=12, color=cg_color, symbol="diamond"),
+            marker=dict(size=13, color=cg_color, symbol="diamond"),
             text=[f"CG: {mac_percent:.2f}% MAC"],
             textposition="top center",
             name="Center of Gravity"
@@ -323,7 +347,7 @@ with col_visual:
             showlegend=False
         )
 
-        st.plotly_chart(fig_3d, use_container_width=True, key="b737_3d_hull_v2")
+        st.plotly_chart(fig_3d, use_container_width=True, key="b737_3d_internal_compartments")
 
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("### Cabin Seating Visualizer:")
