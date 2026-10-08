@@ -64,26 +64,26 @@ col_input, col_visual = st.columns([1, 1])
 with col_input:
     st.subheader("1. مدخلات الرحلة (Flight Inputs)")
     
-    dow = st.number_input("الوزن الفارغ العملياتي (DOW kg):", value=43550)
-    doi = st.number_input("مؤشر الوزن الفارغ (DOI Index):", value=48.2)
+    dow = st.number_input("الوزن الفارغ العملياتي (DOW kg):", value=43550, step=100)
+    doi = st.number_input("مؤشر الوزن الفارغ (DOI Index):", value=48.2, step=0.1)
     
     st.markdown("---")
     st.write("**توزيع الركاب (Passenger Distribution):**")
-    pax_a = st.slider("Zone A (الصف 1-10):", 0, 60, 38)
-    pax_b = st.slider("Zone B (الصف 11-20):", 0, 60, 52)
-    pax_c = st.slider("Zone C (الصف 21-33):", 0, 69, 58)
+    pax_a = st.number_input("Zone A (الصف 1-10) [الأقصى: 60]:", min_value=0, max_value=60, value=38, step=1)
+    pax_b = st.number_input("Zone B (الصف 11-20) [الأقصى: 60]:", min_value=0, max_value=60, value=52, step=1)
+    pax_c = st.number_input("Zone C (الصف 21-33) [الأقصى: 69]:", min_value=0, max_value=69, value=58, step=1)
     
     st.markdown("---")
     st.write("**توزيع عنابر الشحن (Cargo Holds kg):**")
-    c1 = st.number_input("Hold 1 (FWD Upper):", 0, LIMITS["HOLD1_MAX"], 850)
-    c2 = st.number_input("Hold 2 (FWD Lower):", 0, LIMITS["HOLD2_MAX"], 1450)
-    c3 = st.number_input("Hold 3 (AFT Lower):", 0, LIMITS["HOLD3_MAX"], 1800)
-    c4 = st.number_input("Hold 4 (AFT Upper):", 0, LIMITS["HOLD4_MAX"], 450)
+    c1 = st.number_input("Hold 1 (FWD Upper):", min_value=0, max_value=LIMITS["HOLD1_MAX"], value=850, step=50)
+    c2 = st.number_input("Hold 2 (FWD Lower):", min_value=0, max_value=LIMITS["HOLD2_MAX"], value=1450, step=50)
+    c3 = st.number_input("Hold 3 (AFT Lower):", min_value=0, max_value=LIMITS["HOLD3_MAX"], value=1800, step=50)
+    c4 = st.number_input("Hold 4 (AFT Upper):", min_value=0, max_value=LIMITS["HOLD4_MAX"], value=450, step=50)
     
     st.markdown("---")
     st.write("**بيانات الوقود (Fuel Data kg):**")
-    to_fuel = st.number_input("وقود الإقلاع (Takeoff Fuel):", value=10800)
-    trip_fuel = st.number_input("وقود الرحلة (Trip Fuel):", value=7200)
+    to_fuel = st.number_input("وقود الإقلاع (Takeoff Fuel):", value=10800, step=100)
+    trip_fuel = st.number_input("وقود الرحلة (Trip Fuel):", value=7200, step=100)
 
 # الحسابات الأساسية
 pax_a_wt = pax_a * 84
@@ -142,8 +142,9 @@ with col_visual:
     st.markdown("---")
     st.subheader("محرك التغيرات اللحظية واقتراح التوزيع (LMC Engine)")
     
-    lmc_pax = st.slider("تعديل ركاب لحظي (+/- Pax):", -10, 10, 0, format="%+d")
-    lmc_cargo = st.slider("تعديل أمتعة/شحن لحظي (+/- Cargo kg):", -200, 200, 0, step=5, format="%+d kg")
+    # إدخال رقمي مباشر للـ LMC مع أزرار +/-
+    lmc_pax = st.number_input("تعديل ركاب لحظي (+/- Pax):", min_value=-50, max_value=50, value=0, step=1)
+    lmc_cargo = st.number_input("تعديل أمتعة/شحن لحظي (+/- Cargo kg):", min_value=-2000, max_value=2000, value=0, step=5)
     
     if lmc_pax != 0 or lmc_cargo != 0:
         added_pax_wt = lmc_pax * 84
