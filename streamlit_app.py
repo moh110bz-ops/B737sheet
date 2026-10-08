@@ -2,11 +2,23 @@ import streamlit as st
 import plotly.graph_objects as go
 import numpy as np
 
-st.set_page_config(page_title="AirSheet Fleet & Load Control", layout="wide")
+st.set_page_config(page_title="AirSheet - Bader Airlines Fleet", layout="wide")
 
-# Custom Status Badges & Layout CSS
 st.markdown("""
 <style>
+    .hero-title {
+        font-size: 36px;
+        font-weight: bold;
+        color: #0288d1;
+        text-align: center;
+        margin-top: 10px;
+    }
+    .hero-subtitle {
+        font-size: 18px;
+        color: #b0bec5;
+        text-align: center;
+        margin-bottom: 30px;
+    }
     .badge-safe {
         background-color: #1e4620;
         color: #4caf50;
@@ -36,7 +48,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 0. Fleet Database Session State Initialization ---
+# Fleet Database Session State
 if "fleet_db" not in st.session_state:
     st.session_state.fleet_db = {
         "ST-BDG": {
@@ -48,18 +60,9 @@ if "fleet_db" not in st.session_state:
             "doi": 48.2,
             "is_restricted": False,
             "limits": {
-                "MTOW": 79015,
-                "MZFW": 62731,
-                "MLW": 65317,
-                "HOLD1_MAX": 2268,
-                "HOLD2_MAX": 3206,
-                "HOLD3_MAX": 4241,
-                "HOLD4_MAX": 2857,
-                "MAC_MIN": 8.0,
-                "MAC_MAX": 33.0,
-                "CAP_A": 60,
-                "CAP_B": 60,
-                "CAP_C": 69
+                "MTOW": 79015, "MZFW": 62731, "MLW": 65317,
+                "HOLD1_MAX": 2268, "HOLD2_MAX": 3206, "HOLD3_MAX": 4241, "HOLD4_MAX": 2857,
+                "MAC_MIN": 8.0, "MAC_MAX": 33.0, "CAP_A": 60, "CAP_B": 60, "CAP_C": 69
             }
         },
         "ST-BDR": {
@@ -70,205 +73,225 @@ if "fleet_db" not in st.session_state:
             "dow": 43800,
             "doi": 49.0,
             "is_restricted": True,
-            "restriction_reason": "Landing Gear Brake Restriction",
+            "restriction_reason": "Brake System Penalty (Derated MTOW)",
             "limits": {
-                "MTOW": 75000,
-                "MZFW": 61000,
-                "MLW": 63000,
-                "HOLD1_MAX": 2000,
-                "HOLD2_MAX": 3000,
-                "HOLD3_MAX": 4000,
-                "HOLD4_MAX": 2500,
-                "MAC_MIN": 8.0,
-                "MAC_MAX": 33.0,
-                "CAP_A": 60,
-                "CAP_B": 60,
-                "CAP_C": 69
+                "MTOW": 75000, "MZFW": 61000, "MLW": 63000,
+                "HOLD1_MAX": 2000, "HOLD2_MAX": 3000, "HOLD3_MAX": 4000, "HOLD4_MAX": 2500,
+                "MAC_MIN": 8.0, "MAC_MAX": 33.0, "CAP_A": 60, "CAP_B": 60, "CAP_C": 69
             }
         }
     }
 
 if "selected_tail" not in st.session_state:
-    st.session_state.selected_tail = "ST-BDG"
+    st.session_state.selected_tail = None
 
-# Navigation Sidebar
-st.sidebar.title("AirSheet Navigation")
-app_mode = st.sidebar.radio(
-    "Select Module:",
-    ["Fleet Search & Fleet Manager", "AirSheet W&B Engine"]
-)
+if "current_page" not in st.session_state:
+    st.session_state.current_page = "Home"
 
-# Shared Aerodynamic & ICAO Constants
+# TOP NAVIGATION BAR
+nav_col1, nav_col2, nav_col3 = st.columns([2, 1, 1])
+
+with nav_col1:
+    if st.button("Home Hub"):
+        st.session_state.current_page = "Home"
+
+with nav_col2:
+    if st.button("Add New Aircraft"):
+        st.session_state.current_page = "Add_Aircraft"
+
+with nav_col3:
+    if st.button("Edit Aircraft Profile"):
+        st.session_state.current_page = "Edit_Aircraft"
+
+st.markdown("---")
+
 PAX_WEIGHTS = {"ADULT": 84, "CHILD": 35, "INFANT": 10}
 ARMS = {
-    "DOW_ARM": 16.30,
-    "Zone_A": 9.50,
-    "Zone_B": 15.80,
-    "Zone_C": 22.10,
-    "Hold_1": 8.80,
-    "Hold_2": 11.40,
-    "Hold_3": 20.20,
-    "Hold_4": 22.80,
-    "Fuel": 16.20
+    "DOW_ARM": 16.30, "Zone_A": 9.50, "Zone_B": 15.80, "Zone_C": 22.10,
+    "Hold_1": 8.80, "Hold_2": 11.40, "Hold_3": 20.20, "Hold_4": 22.80, "Fuel": 16.20
 }
 LEMAC = 15.56
 MAC_LENGTH = 3.713
 
 
 # ==============================================================================
-# PAGE 1: FLEET SEARCH & FLEET MANAGER
+# 1. HOME PAGE (WELCOME & SEARCH)
 # ==============================================================================
-if app_mode == "Fleet Search & Fleet Manager":
-    st.title("Fleet Control & Search Center")
-    st.caption("Manage Aircraft Profiles, Specific DOW/DOI, and Operational Restrictions (MEL / CDL)")
+if st.session_state.current_page == "Home":
+    
+    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Bader_Airlines_logo.png/600px-Bader_Airlines_logo.png", width=220)
+    
+    st.markdown('<div class="hero-title">AirSheet Flight Dispatch & Load Control Engine</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="hero-subtitle">'
+        'Welcome to Bader Airlines Advanced Fleet Weight & Balance Control System.<br>'
+        'Where aviation engineering precision meets the highest standards of flight safety.'
+        '</div>', 
+        unsafe_allow_html=True
+    )
     
     st.markdown("---")
-    st.subheader("1. Active Aircraft Search & Selection")
     
-    search_term = st.text_input("Search Aircraft Registration / Tail Number (e.g., ST-BDG):", "").strip().upper()
+    c_search_1, c_search_2, c_search_3 = st.columns([1, 2, 1])
+    
+    with c_search_2:
+        st.subheader("Search Aircraft to Launch Calculations:")
+        search_query = st.text_input("Enter Tail Registration (e.g. ST-BDG):", "").strip().upper()
+        
+        available_tails = list(st.session_state.fleet_db.keys())
+        
+        if search_query:
+            matched_tails = [t for t in available_tails if search_query in t]
+        else:
+            matched_tails = available_tails
+
+        if matched_tails:
+            selected_tail_choice = st.selectbox("Select Aircraft from Fleet:", matched_tails)
+            
+            ac_info = st.session_state.fleet_db[selected_tail_choice]
+            st.info(f"**Operator:** {ac_info['airline']} | **Type:** {ac_info['type']} | **Base DOW:** {ac_info['dow']:,} kg")
+            
+            if ac_info["is_restricted"]:
+                st.warning(f"⚠️ **Operational Restriction Active:** {ac_info.get('restriction_reason', 'MEL Limits')}")
+            
+            if st.button("Launch Loadsheet & Calculations", use_container_width=True):
+                st.session_state.selected_tail = selected_tail_choice
+                st.session_state.current_page = "WNB_Engine"
+                st.rerun()
+        else:
+            st.warning("No aircraft found matching this registration. You can add it using the 'Add New Aircraft' button above.")
+
+
+# ==============================================================================
+# 2. PAGE: ADD NEW AIRCRAFT
+# ==============================================================================
+elif st.session_state.current_page == "Add_Aircraft":
+    st.title("Add New Aircraft to Fleet")
+    st.caption("Register a new tail profile with specific DOW, DOI, and structural or MEL operational limits.")
+    
+    new_reg = st.text_input("Registration / Tail Number:", placeholder="e.g. ST-BDS").strip().upper()
+    new_operator = st.text_input("Airline / Operator:", "Bader Airlines")
+    new_type = st.selectbox("Aircraft Type:", ["B737-800"])
+    new_dow = st.number_input("Dry Operating Weight (DOW kg):", value=43550, step=100)
+    new_doi = st.number_input("Dry Operating Index (DOI):", value=48.2, step=0.1)
+    
+    limit_mode = st.radio(
+        "Structural Limit Mode:",
+        ["Manufacturer Standard Limits", "Custom Operational Limits / MEL Derate"]
+    )
+    
+    if limit_mode == "Manufacturer Standard Limits":
+        limits_data = {
+            "MTOW": 79015, "MZFW": 62731, "MLW": 65317,
+            "HOLD1_MAX": 2268, "HOLD2_MAX": 3206, "HOLD3_MAX": 4241, "HOLD4_MAX": 2857,
+            "MAC_MIN": 8.0, "MAC_MAX": 33.0, "CAP_A": 60, "CAP_B": 60, "CAP_C": 69
+        }
+        is_restr = False
+        restr_reason = ""
+    else:
+        is_restr = True
+        restr_reason = st.text_input("Restriction / Defect Reason (MEL):", "Brake Limitation Penalty")
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            mtow_v = st.number_input("Max Takeoff Weight (MTOW kg):", value=75000, step=500)
+            h1_v = st.number_input("Hold 1 Max Limit (kg):", value=2000, step=100)
+            h2_v = st.number_input("Hold 2 Max Limit (kg):", value=3000, step=100)
+        with c2:
+            mzfw_v = st.number_input("Max Zero Fuel Weight (MZFW kg):", value=61000, step=500)
+            h3_v = st.number_input("Hold 3 Max Limit (kg):", value=4000, step=100)
+        with c3:
+            mlw_v = st.number_input("Max Landing Weight (MLW kg):", value=63000, step=500)
+            h4_v = st.number_input("Hold 4 Max Limit (kg):", value=2500, step=100)
+            
+        limits_data = {
+            "MTOW": mtow_v, "MZFW": mzfw_v, "MLW": mlw_v,
+            "HOLD1_MAX": h1_v, "HOLD2_MAX": h2_v, "HOLD3_MAX": h3_v, "HOLD4_MAX": h4_v,
+            "MAC_MIN": 8.0, "MAC_MAX": 33.0, "CAP_A": 60, "CAP_B": 60, "CAP_C": 69
+        }
+
+    if st.button("Save Aircraft to Database"):
+        if new_reg:
+            st.session_state.fleet_db[new_reg] = {
+                "registration": new_reg,
+                "airline": new_operator,
+                "type": new_type,
+                "status": "Restricted (MEL/Derated)" if is_restr else "Operational",
+                "dow": new_dow,
+                "doi": new_doi,
+                "is_restricted": is_restr,
+                "restriction_reason": restr_reason,
+                "limits": limits_data
+            }
+            st.success(f"Aircraft {new_reg} successfully registered!")
+            st.session_state.current_page = "Home"
+            st.rerun()
+        else:
+            st.error("Please enter a valid Tail Registration.")
+
+
+# ==============================================================================
+# 3. PAGE: EDIT EXISTING AIRCRAFT
+# ==============================================================================
+elif st.session_state.current_page == "Edit_Aircraft":
+    st.title("Edit Existing Aircraft Profile")
+    st.caption("Update weights and operational limitations in case of maintenance or technical restrictions.")
     
     available_tails = list(st.session_state.fleet_db.keys())
-    if search_term:
-        filtered_tails = [t for t in available_tails if search_term in t]
-    else:
-        filtered_tails = available_tails
-
-    if filtered_tails:
-        cols = st.columns(min(len(filtered_tails), 3))
-        for idx, tail in enumerate(filtered_tails):
-            ac = st.session_state.fleet_db[tail]
-            with cols[idx % 3]:
-                st.markdown(f"### {ac['registration']}")
-                st.write(f"**Operator:** {ac['airline']}")
-                st.write(f"**Type:** {ac['type']}")
-                st.write(f"**Base DOW:** {ac['dow']:,} kg | **DOI:** {ac['doi']}")
-                
-                if ac["is_restricted"]:
-                    st.error(f"STATUS: {ac['status']}")
-                    st.caption(f"Reason: {ac.get('restriction_reason', 'N/A')}")
-                else:
-                    st.success(f"STATUS: {ac['status']}")
-
-                if st.button(f"Select {tail} for Flight", key=f"btn_select_{tail}"):
-                    st.session_state.selected_tail = tail
-                    st.success(f"Selected {tail} as Active Aircraft!")
-    else:
-        st.warning("No aircraft found matching your search term.")
-
-    st.markdown("---")
-    st.subheader("2. Add or Edit Aircraft Profile & Operational Limits")
+    target_tail = st.selectbox("Select Aircraft to Edit:", available_tails)
     
-    tab_add, tab_edit = st.tabs(["Add New Aircraft", "Edit Existing Aircraft"])
+    ac_target = st.session_state.fleet_db[target_tail]
     
-    with tab_add:
-        st.write("**Create a New Tail Profile:**")
-        new_reg = st.text_input("Registration / Tail Number (e.g. ST-BDS):").strip().upper()
-        new_operator = st.text_input("Airline / Operator:", "Bader Airlines")
-        new_type = st.selectbox("Aircraft Model:", ["B737-800"])
-        new_dow = st.number_input("Base DOW (kg):", value=43550, step=100, key="add_dow")
-        new_doi = st.number_input("Base DOI:", value=48.2, step=0.1, key="add_doi")
-        
-        limit_option = st.radio(
-            "Operational Limit Mode:",
-            ["Manufacturer Standard Limits", "Custom Restricted Limits (MEL / Derated)"],
-            key="add_limit_mode"
-        )
-        
-        if limit_option == "Manufacturer Standard Limits":
-            add_limits = {
-                "MTOW": 79015, "MZFW": 62731, "MLW": 65317,
-                "HOLD1_MAX": 2268, "HOLD2_MAX": 3206, "HOLD3_MAX": 4241, "HOLD4_MAX": 2857,
-                "MAC_MIN": 8.0, "MAC_MAX": 33.0, "CAP_A": 60, "CAP_B": 60, "CAP_C": 69
-            }
-            is_restr = False
-            restr_reason = ""
-        else:
-            is_restr = True
-            restr_reason = st.text_input("Restriction / Defect Reason:", "Operational Weight Penalty")
-            c_l1, c_l2, c_l3 = st.columns(3)
-            with c_l1:
-                mtow_val = st.number_input("Max Takeoff Weight (MTOW kg):", value=75000, step=500)
-                h1_val = st.number_input("Hold 1 Max Limit (kg):", value=2000, step=100)
-                h2_val = st.number_input("Hold 2 Max Limit (kg):", value=3000, step=100)
-            with c_l2:
-                mzfw_val = st.number_input("Max Zero Fuel Weight (MZFW kg):", value=61000, step=500)
-                h3_val = st.number_input("Hold 3 Max Limit (kg):", value=4000, step=100)
-            with c_l3:
-                mlw_val = st.number_input("Max Landing Weight (MLW kg):", value=63000, step=500)
-                h4_val = st.number_input("Hold 4 Max Limit (kg):", value=2500, step=100)
-                
-            add_limits = {
-                "MTOW": mtow_val, "MZFW": mzfw_val, "MLW": mlw_val,
-                "HOLD1_MAX": h1_val, "HOLD2_MAX": h2_val, "HOLD3_MAX": h3_val, "HOLD4_MAX": h4_val,
-                "MAC_MIN": 8.0, "MAC_MAX": 33.0, "CAP_A": 60, "CAP_B": 60, "CAP_C": 69
-            }
+    e_dow = st.number_input("Updated DOW (kg):", value=ac_target["dow"], step=100)
+    e_doi = st.number_input("Updated DOI:", value=ac_target["doi"], step=0.1)
+    
+    e_restricted = st.checkbox("Apply Operational Restriction / Technical Defect", value=ac_target["is_restricted"])
+    
+    if e_restricted:
+        e_reason = st.text_input("Restriction Reason:", ac_target.get("restriction_reason", ""))
+        ec1, ec2, ec3 = st.columns(3)
+        with ec1:
+            e_mtow = st.number_input("MTOW Limit (kg):", value=ac_target["limits"]["MTOW"], step=500)
+        with ec2:
+            e_mzfw = st.number_input("MZFW Limit (kg):", value=ac_target["limits"]["MZFW"], step=500)
+        with ec3:
+            e_mlw = st.number_input("MLW Limit (kg):", value=ac_target["limits"]["MLW"], step=500)
+    else:
+        e_reason = ""
+        e_mtow, e_mzfw, e_mlw = 79015, 62731, 65317
 
-        if st.button("Save New Aircraft to Fleet"):
-            if new_reg:
-                st.session_state.fleet_db[new_reg] = {
-                    "registration": new_reg,
-                    "airline": new_operator,
-                    "type": new_type,
-                    "status": "Restricted (MEL/Derated)" if is_restr else "Operational",
-                    "dow": new_dow,
-                    "doi": new_doi,
-                    "is_restricted": is_restr,
-                    "restriction_reason": restr_reason,
-                    "limits": add_limits
-                }
-                st.success(f"Aircraft {new_reg} successfully registered!")
-                st.session_state.selected_tail = new_reg
-            else:
-                st.error("Please enter a valid Tail Registration Number.")
-
-    with tab_edit:
-        target_tail = st.selectbox("Select Aircraft to Edit:", available_tails)
-        target_ac = st.session_state.fleet_db[target_tail]
+    if st.button("Update Aircraft Profile"):
+        st.session_state.fleet_db[target_tail]["dow"] = e_dow
+        st.session_state.fleet_db[target_tail]["doi"] = e_doi
+        st.session_state.fleet_db[target_tail]["is_restricted"] = e_restricted
+        st.session_state.fleet_db[target_tail]["status"] = "Restricted (MEL/Derated)" if e_restricted else "Operational"
+        st.session_state.fleet_db[target_tail]["restriction_reason"] = e_reason
+        st.session_state.fleet_db[target_tail]["limits"]["MTOW"] = e_mtow
+        st.session_state.fleet_db[target_tail]["limits"]["MZFW"] = e_mzfw
+        st.session_state.fleet_db[target_tail]["limits"]["MLW"] = e_mlw
         
-        st.write(f"Editing Profile for **{target_tail}**:")
-        edit_dow = st.number_input("Updated DOW (kg):", value=target_ac["dow"], step=100, key="edit_dow")
-        edit_doi = st.number_input("Updated DOI:", value=target_ac["doi"], step=0.1, key="edit_doi")
-        
-        edit_restricted = st.checkbox("Apply Operational Restriction / Derated Limits", value=target_ac["is_restricted"])
-        
-        if edit_restricted:
-            edit_reason = st.text_input("Restriction Reason:", target_ac.get("restriction_reason", ""))
-            e_c1, e_c2, e_c3 = st.columns(3)
-            with e_c1:
-                e_mtow = st.number_input("MTOW Limit (kg):", value=target_ac["limits"]["MTOW"], step=500)
-            with e_c2:
-                e_mzfw = st.number_input("MZFW Limit (kg):", value=target_ac["limits"]["MZFW"], step=500)
-            with e_c3:
-                e_mlw = st.number_input("MLW Limit (kg):", value=target_ac["limits"]["MLW"], step=500)
-        else:
-            edit_reason = ""
-            e_mtow, e_mzfw, e_mlw = 79015, 62731, 65317
-
-        if st.button("Update Aircraft Profile"):
-            st.session_state.fleet_db[target_tail]["dow"] = edit_dow
-            st.session_state.fleet_db[target_tail]["doi"] = edit_doi
-            st.session_state.fleet_db[target_tail]["is_restricted"] = edit_restricted
-            st.session_state.fleet_db[target_tail]["status"] = "Restricted (MEL/Derated)" if edit_restricted else "Operational"
-            st.session_state.fleet_db[target_tail]["restriction_reason"] = edit_reason
-            st.session_state.fleet_db[target_tail]["limits"]["MTOW"] = e_mtow
-            st.session_state.fleet_db[target_tail]["limits"]["MZFW"] = e_mzfw
-            st.session_state.fleet_db[target_tail]["limits"]["MLW"] = e_mlw
-            st.success(f"Aircraft {target_tail} profile updated successfully!")
+        st.success(f"Aircraft {target_tail} successfully updated!")
+        st.session_state.current_page = "Home"
+        st.rerun()
 
 
 # ==============================================================================
-# PAGE 2: AIRSHEET W&B ENGINE (SIGMA CORE DRIVEN)
+# 4. PAGE: AIRSHEET W&B ENGINE (SIGMA CORE DRIVEN)
 # ==============================================================================
-elif app_mode == "AirSheet W&B Engine":
+elif st.session_state.current_page == "WNB_Engine":
     active_tail = st.session_state.selected_tail
+    
+    if not active_tail or active_tail not in st.session_state.fleet_db:
+        st.warning("Please select an aircraft first from the Home page.")
+        st.stop()
+
     ac_data = st.session_state.fleet_db[active_tail]
     LIMITS = ac_data["limits"]
 
-    st.title(f"AirSheet: B737-800 [{active_tail}]")
-    st.caption(f"Active Aircraft: {active_tail} ({ac_data['airline']}) | Status: {ac_data['status']}")
+    st.title(f"AirSheet Engine - B737-800 [{active_tail}]")
+    st.caption(f"Operator: {ac_data['airline']} | Status: {ac_data['status']}")
     
     if ac_data["is_restricted"]:
-        st.warning(f"**RESTRICTED AIRCRAFT LIMITS ACTIVE:** {ac_data.get('restriction_reason', 'Operational Derate')}")
+        st.warning(f"⚠️ **Active Operational Limitations:** {ac_data.get('restriction_reason', 'MEL Derated')}")
 
     col_input, col_visual = st.columns([1, 1])
 
@@ -549,7 +572,7 @@ elif app_mode == "AirSheet W&B Engine":
                 showlegend=False
             )
 
-            st.plotly_chart(fig_3d, use_container_width=True, key="b737_3d_fleet_aware")
+            st.plotly_chart(fig_3d, use_container_width=True, key="b737_3d_engine_v5")
 
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("### Cabin Seating Visualizer:")
