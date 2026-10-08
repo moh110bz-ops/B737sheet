@@ -30,29 +30,31 @@ MAC_LENGTH = 3.713
 
 st.set_page_config(page_title="AirSheet - B737-800", layout="wide")
 
-# تخصيص ألوان كروت الحالة (Badge Colors CSS)
+# تخصيص ألوان البطاقات والنصوص (CSS)
 st.markdown("""
 <style>
     .badge-safe {
         background-color: #1e4620;
         color: #4caf50;
-        padding: 6px 14px;
+        padding: 8px 16px;
         border-radius: 6px;
         font-weight: bold;
         display: inline-block;
         border: 1px solid #2e7d32;
+        font-size: 16px;
     }
     .badge-danger {
         background-color: #5c1d1d;
         color: #ff5252;
-        padding: 6px 14px;
+        padding: 8px 16px;
         border-radius: 6px;
         font-weight: bold;
         display: inline-block;
         border: 1px solid #d32f2f;
+        font-size: 16px;
     }
 </style>
-""", unsafe_allow_syntax_gradient=True, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
 st.title("AirSheet: B737-800 Weight & Balance Engine")
 st.caption("نظام التوزين والتوازن العملياتي لـ Boeing 737-800")
@@ -140,8 +142,7 @@ with col_visual:
     st.markdown("---")
     st.subheader("محرك التغيرات اللحظية واقتراح التوزيع (LMC Engine)")
     
-    # استخدام ستايل الإشارات لتعديلات الـ LMC
-    lmc_pax = st.slider("تعديل ركاب لحظي (+/- Pax):", -10, 10, 0, format="%+d راكب")
+    lmc_pax = st.slider("تعديل ركاب لحظي (+/- Pax):", -10, 10, 0, format="%+d")
     lmc_cargo = st.slider("تعديل أمتعة/شحن لحظي (+/- Cargo kg):", -200, 200, 0, step=5, format="%+d kg")
     
     if lmc_pax != 0 or lmc_cargo != 0:
@@ -151,7 +152,6 @@ with col_visual:
         
         st.markdown("#### مقترح التوزيع الذكي للـ LMC:")
         
-        # 1. اقتراح توزيع الركاب
         pax_suggestions = []
         if lmc_pax > 0:
             rem_pax = lmc_pax
@@ -180,7 +180,6 @@ with col_visual:
         elif lmc_pax < 0:
             pax_suggestions.append(f"• إلغاء {abs(lmc_pax)} راكب من المنطقة الأكثر ازدحاماً (Zone C أو Zone B)")
 
-        # 2. اقتراح توزيع الأمتعة/الشحن
         cargo_suggestions = []
         if lmc_cargo > 0:
             if lmc_cargo <= 50:
@@ -193,6 +192,5 @@ with col_visual:
         elif lmc_cargo < 0:
             cargo_suggestions.append(f"• إنقاص {abs(lmc_cargo)} kg من Hold 3 أو Hold 2")
 
-        # عرض التوصية
         st.success("\n".join(pax_suggestions + cargo_suggestions))
         st.info("يمكنك الآن الصعود إلى الأعلى لتحديث خانات المدخلات الرئيسية بهذه الأرقام لاعتماد الـ Loadsheet النهائي.")
