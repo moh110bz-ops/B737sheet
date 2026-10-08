@@ -224,7 +224,8 @@ with col_visual:
         
     with m3:
         st.caption(f"**LW (Max: {LIMITS['MLW']:,} kg)**")
-        st.metric(label="Landing Wt", value=f"{lw:,} kg", delta="SAFE" if is_lw_safe else f"EXCEEDED (+{lw - LIMITS['MLW']} kg)", delta_color="normal" if is_lw_safe else "    # --- Simplified Clean Trim Sheet Envelope Graph ---    # --- Simplified Clean Trim Sheet Envelope Graph ---
+        st.metric(label="Landing Wt", value=f"{int(lw):,} kg")
+
     st.markdown("---")
     st.markdown("### 📈 CG Trim Sheet Envelope")
 
