@@ -101,20 +101,14 @@ if st.session_state.current_page == "Home":
     c_search_1, c_search_2, c_search_3 = st.columns([1, 2, 1])
     
     with c_search_2:
-        st.subheader("Search Aircraft to Launch Calculations:")
-        search_query = st.text_input("Enter Tail Registration:", value="", placeholder="ST-BDG", key="home_search").strip().upper()
+        st.subheader("Select Aircraft from System Fleet:")
         
         available_tails = list(st.session_state.fleet_db.keys())
         
         if available_tails:
-            if search_query:
-                matched_tails = [t for t in available_tails if search_query in t]
-            else:
-                matched_tails = available_tails
-
-            if matched_tails:
-                selected_tail_choice = st.selectbox("Select Aircraft from Fleet:", matched_tails)
-                
+            selected_tail_choice = st.selectbox("Select Tail Registration:", available_tails, index=0)
+            
+            if selected_tail_choice:
                 ac_info = st.session_state.fleet_db[selected_tail_choice]
                 st.info(f"**Operator:** {ac_info['airline']} | **Type:** {ac_info['type']} | **Base DOW:** {ac_info['dow']:,} kg")
                 
@@ -125,8 +119,6 @@ if st.session_state.current_page == "Home":
                     st.session_state.selected_tail = selected_tail_choice
                     st.session_state.current_page = "WNB_Engine"
                     st.rerun()
-            else:
-                st.warning("No aircraft found matching this registration search.")
         else:
             st.info("No aircraft registered in the system yet. Please click 'Add New Aircraft' above to start.")
 
@@ -545,7 +537,7 @@ elif st.session_state.current_page == "WNB_Engine":
                 showlegend=False
             )
 
-            st.plotly_chart(fig_3d, use_container_width=True, key="b737_3d_engine_v7")
+            st.plotly_chart(fig_3d, use_container_width=True, key="b737_3d_engine_v8")
 
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("### Cabin Seating Visualizer:")
